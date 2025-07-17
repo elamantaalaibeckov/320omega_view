@@ -1,0 +1,51 @@
+name: omega_view_smart_plan_320
+description: Ваше описание
+
+# Версия Flutter SDK
+environment:
+  sdk: ">=2.18.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_screenutil: ^5.9.3
+  intl: ^0.17.0
+  image_picker: ^1.1.2
+  # Hive
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+
+  # Bloc
+  flutter_bloc: ^8.1.2
+  bloc: ^8.1.0
+
+  # Cupertino Icons
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  # Генерация адаптеров Hive
+  hive_generator: ^2.0.1
+  build_runner:   ^2.3.3
+
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+     - assets/images/
+     - assets/icons/
+
+  fonts:
+    - family: SF PRO
+      fonts:
+        - asset: assets/fonts/SF-Pro-Display-Light.otf
+  #       - asset: fonts/Schyler-Italic.ttf
+  #   - family: Trajan Pro
+  #     fonts:
+  #       - asset: fonts/TrajanPro.ttf
+  #       - asset: fonts/TrajanPro_Bold.ttf
+  #         weight: 700
