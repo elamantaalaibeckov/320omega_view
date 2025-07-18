@@ -68,7 +68,7 @@ class _CupertinoDateTimeFieldState extends State<CupertinoDateTimeField> {
     showCupertinoModalPopup(
       context: context,
       builder: (_) => Container(
-        height: 300,
+        height: 250,
         color: Colors.white,
         child: Column(
           children: [
@@ -80,12 +80,28 @@ class _CupertinoDateTimeFieldState extends State<CupertinoDateTimeField> {
                 children: [
                   CupertinoButton(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: const Text('Cancel'),
+                    child: const Text(
+                      'Cancel',
+                      style: TextStyle(
+                        color: AppColors.mainAccent,
+                        fontSize: 17,
+                        fontFamily: 'SF Pro',
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                   CupertinoButton(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: const Text('Done'),
+                    child: const Text(
+                      'Done',
+                      style: TextStyle(
+                        color: AppColors.mainAccent,
+                        fontSize: 17,
+                        fontFamily: 'SF Pro',
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
                     onPressed: () {
                       setState(() {
                         _tempDateTime = picked;
@@ -98,6 +114,12 @@ class _CupertinoDateTimeFieldState extends State<CupertinoDateTimeField> {
                 ],
               ),
             ),
+            const Divider(
+              height: 0.6,
+              thickness: 0.6, // толщина линии
+              color: AppColors.textgrey, // или любой другой цвет
+            ),
+
             // — Сам пикер —
             Expanded(
               child: CupertinoDatePicker(
