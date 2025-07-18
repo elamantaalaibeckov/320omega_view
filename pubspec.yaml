@@ -9,6 +9,7 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_screenutil: ^5.9.3
+  permission_handler: ^10.4.0
   intl: ^0.17.0
   image_picker: ^1.1.2
   # Hive

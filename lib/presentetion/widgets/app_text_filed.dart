@@ -10,7 +10,8 @@ class AppTextField extends StatefulWidget {
   final TextInputType keyboardType;
   final bool isNumberOnly;
   final bool isMultiline;
-  final bool readOnly; // поддержка режима только для чтения
+  final bool readOnly;
+  final ValueChanged<String>? onChanged;
 
   const AppTextField({
     super.key,
@@ -20,6 +21,7 @@ class AppTextField extends StatefulWidget {
     this.isNumberOnly = false,
     this.isMultiline = false,
     this.readOnly = false,
+    this.onChanged,
   });
 
   @override
@@ -39,6 +41,7 @@ class _AppTextFieldState extends State<AppTextField> {
       alignment: Alignment.center,
       child: TextField(
         controller: widget.controller,
+        onChanged: widget.onChanged,
         readOnly: widget.readOnly,
         keyboardType: widget.isNumberOnly
             ? TextInputType.number
@@ -52,14 +55,14 @@ class _AppTextFieldState extends State<AppTextField> {
         maxLines: widget.isMultiline ? 6 : 1,
         style: TextStyle(
           fontSize: 16.sp,
-          color: AppColors.textgrey,
+          color: AppColors.textWhite, // Киргизилген текст ак түстө
           fontWeight: FontWeight.w500,
           fontFamily: 'SF PRO',
         ),
         decoration: InputDecoration(
           hintText: widget.hintText,
           hintStyle: TextStyle(
-            color: const Color(0xFF7A7A7A),
+            color: AppColors.textgrey, // Hint тексти боз түстө
             fontSize: 15.sp,
             fontFamily: 'SF PRO',
             fontWeight: FontWeight.w400,
