@@ -1,14 +1,19 @@
 import 'dart:io';
-
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:uuid/uuid.dart'; // Add uuid for unique IDs
 
-// Сиздин custom виджеттериңиздин импорттору
-import 'package:omega_view_smart_plan_320/presentetion/pages/shoots/screens/cupertino_date_picker.dart'; // Бул файлдын атын туураладым
+// Cubit and Model imports
+import 'package:omega_view_smart_plan_320/cubit/shoots/shoots_cubit.dart';
+import 'package:omega_view_smart_plan_320/model/omega_shoot_model.dart';
+
+// Your custom widget imports
+import 'package:omega_view_smart_plan_320/presentetion/pages/shoots/screens/cupertino_date_picker.dart';
 import 'package:omega_view_smart_plan_320/presentetion/themes/app_colors.dart';
 import 'package:omega_view_smart_plan_320/presentetion/themes/app_icons.dart';
 import 'package:omega_view_smart_plan_320/presentetion/widgets/app_text.dart';
@@ -23,7 +28,7 @@ class PlannedAddShoot extends StatefulWidget {
 
 class _PlannedAddShootState extends State<PlannedAddShoot>
     with SingleTickerProviderStateMixin {
-  // Planned үчүн өзүнчө дата/убакыт өзгөрмөлөрү
+  // Planned for own date/time variables
   DateTime _plannedSelectedDate = DateTime.now();
   DateTime _plannedSelectedTime = DateTime(
     0,
@@ -33,7 +38,7 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
     TimeOfDay.now().minute,
   );
 
-  // Completed үчүн өзүнчө дата/убакыт өзгөрмөлөрү
+  // Completed for own date/time variables
   DateTime _completedSelectedDate = DateTime.now();
   DateTime _completedSelectedTime = DateTime(
     0,
@@ -46,24 +51,29 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
   late final TabController _tc;
   bool _notify = false;
 
-  // PICK FLAGS - Бул флагдар ар бир дата/убакыт тандалганын көзөмөлдөйт.
-  // Башында false болгондуктан, "Select" деген текст көрүнөт.
+  // PICK FLAGS
   bool _plannedDatePicked = false;
   bool _plannedTimePicked = false;
   bool _completedDatePicked = false;
   bool _completedTimePicked = false;
 
   // TEXT CONTROLLERS
-  final _plannedNameCtrl = TextEditingController();
+  final _plannedClientNameCtrl = TextEditingController();
   final _plannedAddressCtrl = TextEditingController();
-  final _completedNameCtrl = TextEditingController();
+  final _plannedCommentsCtrl =
+      TextEditingController(); // Added comments controller
+
+  final _completedClientNameCtrl = TextEditingController();
   final _completedAddressCtrl = TextEditingController();
+  final _completedCommentsCtrl =
+      TextEditingController(); // Added comments controller
 
   // PHOTO LISTS
   final List<XFile> _refPhotos = [];
   final List<XFile> _finalShots = [];
   static const int _maxPhotos = 17;
   final ImagePicker _picker = ImagePicker();
+  final Uuid _uuid = const Uuid(); // Initialize Uuid
 
   @override
   void initState() {
@@ -75,10 +85,12 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
   @override
   void dispose() {
     _tc.dispose();
-    _plannedNameCtrl.dispose();
+    _plannedClientNameCtrl.dispose();
     _plannedAddressCtrl.dispose();
-    _completedNameCtrl.dispose();
+    _plannedCommentsCtrl.dispose();
+    _completedClientNameCtrl.dispose();
     _completedAddressCtrl.dispose();
+    _completedCommentsCtrl.dispose();
     super.dispose();
   }
 
@@ -123,6 +135,40 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
 
   void _removePhoto(List<XFile> list, int i) =>
       setState(() => list.removeAt(i));
+
+  void _addPlannedShoot() {
+    final newShoot = OmegaShootModel.planned(
+      id: _uuid.v4(), // Generate a unique ID
+      clientName: _plannedClientNameCtrl.text,
+      date: _plannedSelectedDate,
+      time: _plannedSelectedTime,
+      address: _plannedAddressCtrl.text,
+      comments: _plannedCommentsCtrl.text.isNotEmpty
+          ? _plannedCommentsCtrl.text
+          : null,
+      shootReferencesPaths: _refPhotos.map((xfile) => xfile.path).toList(),
+      notificationsEnabled: _notify,
+    );
+    context.read<ShootsCubit>().addShoot(newShoot);
+    Navigator.pop(context);
+  }
+
+  void _addCompletedShoot() {
+    final newShoot = OmegaShootModel.completed(
+      id: _uuid.v4(), // Generate a unique ID
+      clientName: _completedClientNameCtrl.text,
+      date: _completedSelectedDate,
+      time: _completedSelectedTime,
+      address: _completedAddressCtrl.text,
+      finalShotsPaths: _finalShots.map((xfile) => xfile.path).toList(),
+      comments: _completedCommentsCtrl.text.isNotEmpty
+          ? _completedCommentsCtrl.text
+          : null,
+      shootReferencesPaths: _refPhotos.map((xfile) => xfile.path).toList(),
+    );
+    context.read<ShootsCubit>().addShoot(newShoot);
+    Navigator.pop(context);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -187,10 +233,10 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
   }
 
   Widget _buildPlannedForm() {
-    // enable when all 4 filled
+    // enable when all required fields filled
     final bool plannedEnabled = _plannedDatePicked &&
         _plannedTimePicked &&
-        _plannedNameCtrl.text.isNotEmpty &&
+        _plannedClientNameCtrl.text.isNotEmpty &&
         _plannedAddressCtrl.text.isNotEmpty;
 
     final ButtonStyle style = ButtonStyle(
@@ -210,33 +256,33 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
         const AppTexts(texTs: 'Select Day'),
         SizedBox(height: 8.h),
         CupertinoDateTimeField(
-          isPicked: _plannedDatePicked, // Жаңы касиетти берүү
+          isPicked: _plannedDatePicked,
           initialDateTime: _plannedSelectedDate,
           mode: CupertinoDatePickerMode.date,
           formatter: DateFormat('MMM dd, yyyy'),
           onDateTimeChanged: (dt) => setState(() {
             _plannedSelectedDate = dt;
-            _plannedDatePicked = true; // Бул дата тандалды дегенди билдирет
+            _plannedDatePicked = true;
           }),
         ),
         SizedBox(height: 16.h),
         const AppTexts(texTs: 'Select Time'),
         SizedBox(height: 8.h),
         CupertinoDateTimeField(
-          isPicked: _plannedTimePicked, // Жаңы касиетти берүү
+          isPicked: _plannedTimePicked,
           initialDateTime: _plannedSelectedTime,
           mode: CupertinoDatePickerMode.time,
           formatter: DateFormat('HH:mm'),
           onDateTimeChanged: (dt) => setState(() {
             _plannedSelectedTime = dt;
-            _plannedTimePicked = true; // Бул убакыт тандалды дегенди билдирет
+            _plannedTimePicked = true;
           }),
         ),
         SizedBox(height: 16.h),
         const AppTexts(texTs: 'Client’s Name'),
         SizedBox(height: 8.h),
         AppTextField(
-          controller: _plannedNameCtrl,
+          controller: _plannedClientNameCtrl,
           hintText: 'Client’s Name',
           onChanged: (_) => setState(() {}),
         ),
@@ -258,7 +304,10 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
         SizedBox(height: 16.h),
         const AppTexts(texTs: 'Comments (optional)'),
         SizedBox(height: 8.h),
-        AppTextField(hintText: 'Add Comments'),
+        AppTextField(
+          controller: _plannedCommentsCtrl,
+          hintText: 'Add Comments',
+        ),
         SizedBox(height: 16.h),
         Container(
           width: double.infinity,
@@ -304,11 +353,7 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
           height: 52.h,
           child: ElevatedButton(
             style: style,
-            onPressed: plannedEnabled
-                ? () {
-                    // Planned save action
-                  }
-                : null,
+            onPressed: plannedEnabled ? _addPlannedShoot : null,
             child: Text('Add',
                 style: TextStyle(
                   color: AppColors.textWhite,
@@ -324,7 +369,7 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
   Widget _buildCompletedForm() {
     final bool completedEnabled = _completedDatePicked &&
         _completedTimePicked &&
-        _completedNameCtrl.text.isNotEmpty &&
+        _completedClientNameCtrl.text.isNotEmpty &&
         _completedAddressCtrl.text.isNotEmpty &&
         _finalShots.isNotEmpty;
 
@@ -345,7 +390,7 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
         const AppTexts(texTs: 'Select Day'),
         SizedBox(height: 8.h),
         CupertinoDateTimeField(
-          isPicked: _completedDatePicked, // Жаңы касиетти берүү
+          isPicked: _completedDatePicked,
           initialDateTime: _completedSelectedDate,
           mode: CupertinoDatePickerMode.date,
           formatter: DateFormat('MMM dd, yyyy'),
@@ -358,7 +403,7 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
         const AppTexts(texTs: 'Select Time'),
         SizedBox(height: 8.h),
         CupertinoDateTimeField(
-          isPicked: _completedTimePicked, // Жаңы касиетти берүү
+          isPicked: _completedTimePicked,
           initialDateTime: _completedSelectedTime,
           mode: CupertinoDatePickerMode.time,
           formatter: DateFormat('HH:mm'),
@@ -371,7 +416,7 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
         const AppTexts(texTs: 'Client’s Name'),
         SizedBox(height: 8.h),
         AppTextField(
-          controller: _completedNameCtrl,
+          controller: _completedClientNameCtrl,
           hintText: 'Client’s Name',
           onChanged: (_) => setState(() {}),
         ),
@@ -400,18 +445,17 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
         SizedBox(height: 16.h),
         const AppTexts(texTs: 'Comments (optional)'),
         SizedBox(height: 8.h),
-        AppTextField(hintText: 'Add Comments'),
+        AppTextField(
+          controller: _completedCommentsCtrl,
+          hintText: 'Add Comments',
+        ),
         SizedBox(height: 24.h),
         SizedBox(
           width: double.infinity,
           height: 52.h,
           child: ElevatedButton(
             style: style,
-            onPressed: completedEnabled
-                ? () {
-                    // Completed save action
-                  }
-                : null,
+            onPressed: completedEnabled ? _addCompletedShoot : null,
             child: Text('Add',
                 style: TextStyle(
                   color: AppColors.textWhite,
@@ -465,7 +509,12 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
                 ),
               );
             }
-            final photoIdx = idx - 1;
+            // Adjust photoIdx because the first item is the add button
+            final photoIdx = list.length < _maxPhotos ? idx - 1 : idx;
+            if (photoIdx < 0 || photoIdx >= list.length) {
+              return const SizedBox
+                  .shrink(); // Should not happen with correct logic
+            }
             return Stack(
               children: [
                 Container(

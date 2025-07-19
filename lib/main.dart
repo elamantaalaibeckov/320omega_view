@@ -1,5 +1,3 @@
-// lib/main.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -15,8 +13,12 @@ import 'cubit/transactions/transactions_cubit.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Инициализация Hive
   await Hive.initFlutter();
+
+  // -------- очистка бокса (выполни один раз и потом удали строку) ----------
+  await Hive.deleteBoxFromDisk('shootsBox');
+  // ------------------------------------------------------------------------
+
   await ShootsHiveService.init();
   await TransactionHiveService.init();
 
@@ -52,7 +54,6 @@ class OmegaApp extends StatelessWidget {
       title: 'Omega App',
       theme: ThemeData(
         scaffoldBackgroundColor: AppColors.bgColor,
-        // Вместо устаревшего bottomAppBarColor:
         bottomAppBarTheme: BottomAppBarTheme(
           color: AppColors.bottomNavigatorAppBarColor,
         ),

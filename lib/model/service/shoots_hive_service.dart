@@ -1,34 +1,28 @@
-// lib/model/service/shoots_hive_service.dart
-
 import 'package:hive_flutter/hive_flutter.dart';
-import '../omega_shoot_model.dart';
+
+import '../omega_shoot_model.dart'; // автогенерируемый адаптер (typeId = 0)
+import '../omega_shoot_model_adapter_v2.dart'; // «умный» адаптер (typeId = 2)
 
 class ShootsHiveService {
   static const String _boxName = 'shootsBox';
 
-  /// Инициализацияны башта: адаптерди каттоo жана боксту ачуу
+  /// Регистрируем адаптеры и открываем бокс
   static Future<void> init() async {
     if (!Hive.isAdapterRegistered(0)) {
-      Hive.registerAdapter(OmegaShootModelAdapter());
+      Hive.registerAdapter(OmegaShootModelAdapter()); // обычный
+    }
+    if (!Hive.isAdapterRegistered(2)) {
+      Hive.registerAdapter(OmegaShootModelV2Adapter()); // новый «умный»
     }
     await Hive.openBox<OmegaShootModel>(_boxName);
   }
 
   Box<OmegaShootModel> get _box => Hive.box<OmegaShootModel>(_boxName);
 
-  /// Бардык “shoot” моделдерин ал
   List<OmegaShootModel> getAll() => _box.values.toList();
-
-  /// Жаңы “shoot” кош
   Future<int> addShoot(OmegaShootModel shoot) => _box.add(shoot);
-
-  /// Моделди ачкыч боюнча жаңырт
   Future<void> updateShoot(int key, OmegaShootModel shoot) =>
       _box.put(key, shoot);
-
-  /// Ачкыч боюнча өчүр
   Future<void> deleteShoot(int key) => _box.delete(key);
-
-  /// Бардыгын тазалоо (талап кылынса)
   Future<void> clearAll() => _box.clear();
 }

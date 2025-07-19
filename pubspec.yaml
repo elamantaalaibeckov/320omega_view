@@ -12,16 +12,13 @@ dependencies:
   permission_handler: ^10.4.0
   intl: ^0.17.0
   image_picker: ^1.1.2
-  # Hive
   hive: ^2.2.3
   hive_flutter: ^1.1.0
-
-  # Bloc
   flutter_bloc: ^8.1.2
   bloc: ^8.1.0
-
-  # Cupertino Icons
   cupertino_icons: ^1.0.8
+  uuid: ^4.0.0 
+  equatable: ^2.0.3 
 
 dev_dependencies:
   flutter_test:
@@ -29,8 +26,7 @@ dev_dependencies:
 
   # Генерация адаптеров Hive
   hive_generator: ^2.0.1
-  build_runner:   ^2.3.3
-
+  build_runner: ^2.4.0
   flutter_lints: ^5.0.0
 
 flutter:

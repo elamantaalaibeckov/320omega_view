@@ -33,16 +33,16 @@ class ShootsState {
   @override
   bool operator ==(Object other) {
     return identical(this, other) ||
-      (other is ShootsState &&
-        const ListEquality().equals(shoots, other.shoots) &&
-        isLoading == other.isLoading &&
-        errorMessage == other.errorMessage);
+        (other is ShootsState &&
+            const ListEquality().equals(shoots, other.shoots) &&
+            isLoading == other.isLoading &&
+            errorMessage == other.errorMessage);
   }
 
   @override
   int get hashCode => Object.hash(
-    const ListEquality().hash(shoots),
-    isLoading,
-    errorMessage,
-  );
+        const ListEquality().hash(shoots),
+        isLoading,
+        errorMessage,
+      );
 }

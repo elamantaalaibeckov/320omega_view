@@ -7,25 +7,93 @@ part 'omega_shoot_model.g.dart';
 @HiveType(typeId: 0)
 class OmegaShootModel extends HiveObject {
   @HiveField(0)
-  final String id;
+  final String id; // Unique ID for the shoot
 
   @HiveField(1)
-  final String title;
+  final String clientName; // Client's Name
 
   @HiveField(2)
-  final DateTime date;
+  final DateTime date; // Date of the shoot
 
   @HiveField(3)
-  final String location;
+  final DateTime time; // Time of the shoot (can be combined with date or stored separately if only time matters)
 
   @HiveField(4)
-  final String description;
+  final String address; // Address of the shoot location
+
+  @HiveField(5)
+  final String? comments; // Comments/Description (optional)
+
+  @HiveField(6)
+  final bool isPlanned; // True if planned, false if completed
+
+  @HiveField(7)
+  final List<String> shootReferencesPaths; // Paths to local images for shoot references (XFile.path)
+
+  @HiveField(8)
+  final List<String>? finalShotsPaths; // Paths to local images for final shots (XFile.path), null for planned
+
+  @HiveField(9)
+  final bool? notificationsEnabled; // True if notifications are enabled, null for completed shoots
 
   OmegaShootModel({
     required this.id,
-    required this.title,
+    required this.clientName,
     required this.date,
-    required this.location,
-    required this.description,
+    required this.time,
+    required this.address,
+    this.comments,
+    required this.isPlanned,
+    this.shootReferencesPaths = const [],
+    this.finalShotsPaths,
+    this.notificationsEnabled,
   });
+
+  // Helper to create a planned shoot
+  factory OmegaShootModel.planned({
+    required String id,
+    required String clientName,
+    required DateTime date,
+    required DateTime time,
+    required String address,
+    String? comments,
+    List<String> shootReferencesPaths = const [],
+    bool notificationsEnabled = false,
+  }) {
+    return OmegaShootModel(
+      id: id,
+      clientName: clientName,
+      date: date,
+      time: time,
+      address: address,
+      comments: comments,
+      isPlanned: true,
+      shootReferencesPaths: shootReferencesPaths,
+      notificationsEnabled: notificationsEnabled,
+    );
+  }
+
+  // Helper to create a completed shoot
+  factory OmegaShootModel.completed({
+    required String id,
+    required String clientName,
+    required DateTime date,
+    required DateTime time,
+    required String address,
+    required List<String> finalShotsPaths,
+    String? comments,
+    List<String> shootReferencesPaths = const [],
+  }) {
+    return OmegaShootModel(
+      id: id,
+      clientName: clientName,
+      date: date,
+      time: time,
+      address: address,
+      comments: comments,
+      isPlanned: false,
+      shootReferencesPaths: shootReferencesPaths,
+      finalShotsPaths: finalShotsPaths,
+    );
+  }
 }
