@@ -386,14 +386,16 @@ class _AddTransactionPageState extends State<AddTransactionPage>
           Padding(
             padding: EdgeInsets.only(top: 16.h),
             child: Container(
+              // 3 карточки по 80.h + 2 разделителя по 12.h + паддинги по 12.h сверху и снизу = 288.h
+              height: 288.h,
               decoration: BoxDecoration(
-                color: AppColors.filedGrey, // Цвет фона для выпадающего списка
+                color: AppColors.filedGrey,
                 borderRadius: BorderRadius.circular(16.r),
               ),
               child: ListView.separated(
-                shrinkWrap: true,
-                physics: NeverScrollableScrollPhysics(),
+                // теперь список сам скроллится
                 padding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 16.w),
+                physics: AlwaysScrollableScrollPhysics(),
                 itemCount: completedShoots.length,
                 separatorBuilder: (_, __) => SizedBox(height: 12.h),
                 itemBuilder: (context, i) {
@@ -422,7 +424,7 @@ class _AddTransactionPageState extends State<AddTransactionPage>
                     child: Container(
                       height: 80.h,
                       decoration: BoxDecoration(
-                        color: AppColors.cardGrey, // Цвет фона карточки
+                        color: AppColors.cardGrey,
                         borderRadius: BorderRadius.circular(16.r),
                         border: Border.all(
                           color:
