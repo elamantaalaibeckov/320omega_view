@@ -37,7 +37,7 @@ flutter:
      - assets/icons/
 
   fonts:
-    - family: SF PRO
+    - family: SF Pro
       fonts:
         - asset: assets/fonts/SF-Pro-Display-Light.otf
   #       - asset: fonts/Schyler-Italic.ttf

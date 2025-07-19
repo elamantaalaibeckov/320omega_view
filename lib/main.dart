@@ -14,10 +14,8 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Hive.initFlutter();
-
-  // -------- очистка бокса (выполни один раз и потом удали строку) ----------
-  await Hive.deleteBoxFromDisk('shootsBox');
-  // ------------------------------------------------------------------------
+  // УБЕРИТЕ или ЗАКОММЕНТИРУЙТЕ эту строку:
+  // await Hive.deleteBoxFromDisk('shootsBox');
 
   await ShootsHiveService.init();
   await TransactionHiveService.init();

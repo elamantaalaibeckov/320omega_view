@@ -9,6 +9,7 @@ import 'package:omega_view_smart_plan_320/cubit/shoots/shoots_state.dart';
 import 'package:omega_view_smart_plan_320/model/omega_shoot_model.dart';
 import 'package:omega_view_smart_plan_320/presentetion/pages/shoots/screens/planned_add_shoot.dart';
 import 'package:omega_view_smart_plan_320/presentetion/themes/app_colors.dart';
+import 'package:omega_view_smart_plan_320/presentetion/themes/app_icons.dart';
 import 'package:omega_view_smart_plan_320/presentetion/themes/app_images.dart';
 import 'package:intl/intl.dart'; // Import for date formatting
 
@@ -201,55 +202,107 @@ class _OmegaViewShootsPageState extends State<OmegaViewShootsPage>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
+              // Основная дата-время
               Text(
-                DateFormat('MMM dd, yyyy, HH:mm').format(DateTime(
+                DateFormat('MMM dd, yyyy, HH:mm').format(
+                  DateTime(
                     shoot.date.year,
                     shoot.date.month,
                     shoot.date.day,
                     shoot.time.hour,
-                    shoot.time.minute)),
+                    shoot.time.minute,
+                  ),
+                ),
                 style: TextStyle(
                   color: AppColors.textWhite,
-                  fontSize: 14.sp,
+                  fontSize: 17.sp,
                   fontWeight: FontWeight.w500,
+                  height: 1.29,
+                  letterSpacing: -0.43,
                 ),
               ),
+
+              SizedBox(width: 4.w),
+
+              // Всегда показываем "AM"
+              Text(
+                'AM',
+                style: TextStyle(
+                  color: AppColors.textWhite,
+                  fontSize: 17.sp,
+                  fontWeight: FontWeight.w500,
+                  height: 1.29,
+                  letterSpacing: -0.43,
+                ),
+              ),
+
+              Spacer(),
+
+              // Иконка для Completed
+              if (!isPlannedTab)
+                Padding(
+                  padding: EdgeInsets.only(right: 115),
+                  child: Container(
+                    width: 12.w,
+                    height: 12.h,
+                    alignment: Alignment.center,
+                    child: Image.asset(
+                      'assets/icons/first_icon.png',
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+
+              // Иконка уведомлений для Planned
               if (isPlannedTab && shoot.notificationsEnabled == true)
-                Icon(Icons.notifications_active,
-                    color: AppColors.mainAccent, size: 20.r),
+                Image.asset(
+                  AppIcons.notficationIcon,
+                  width: 20.w,
+                  height: 21.h,
+                )
             ],
           ),
           SizedBox(height: 8.h),
           Text(
             shoot.clientName,
             style: TextStyle(
-              color: AppColors.textgrey,
-              fontSize: 14.sp,
-              fontWeight: FontWeight.w500,
+              color: AppColors.textWhite,
+              fontSize: 15.sp,
+              fontFamily: 'SF PRo',
+              fontWeight: FontWeight.w400,
+              height: 1.33,
+              letterSpacing: -0.23,
             ),
           ),
           SizedBox(height: 4.h),
           Text(
             shoot.address,
             style: TextStyle(
-              color: AppColors.textgrey,
-              fontSize: 14.sp,
+              color: AppColors.textWhite,
+              fontSize: 15.sp,
+              fontFamily: 'SF PRo',
+              fontWeight: FontWeight.w400,
+              height: 1.33,
+              letterSpacing: -0.23,
             ),
           ),
           if (!isPlannedTab &&
               shoot.finalShotsPaths != null &&
               shoot.finalShotsPaths!.isNotEmpty)
             Column(
-              // crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SizedBox(height: 12.h),
                 Text(
                   'Your Photos',
                   style: TextStyle(
-                    color: AppColors.textgrey,
-                    fontSize: 12.sp,
+                    color: AppColors.grey2,
+                    fontSize: 13.sp,
+                    fontFamily: 'SF PRO',
+                    fontWeight: FontWeight.w400,
+                    height: 1.38,
+                    letterSpacing: -0.08,
                   ),
                 ),
                 SizedBox(height: 8.h),
@@ -261,13 +314,15 @@ class _OmegaViewShootsPageState extends State<OmegaViewShootsPage>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SizedBox(height: 12.h),
-                Text(
-                  'Shoot References',
-                  style: TextStyle(
-                    color: AppColors.textgrey,
-                    fontSize: 12.sp,
+                if (!isPlannedTab)
+                  Text(
+                    'Shoot References',
+                    style: TextStyle(
+                      color: AppColors.textWhite,
+                      fontSize: 13.sp,
+                    ),
                   ),
-                ),
+                if (!isPlannedTab) SizedBox(height: 8.h),
                 SizedBox(height: 8.h),
                 _buildPhotoRow(shoot.shootReferencesPaths),
               ],
@@ -276,20 +331,12 @@ class _OmegaViewShootsPageState extends State<OmegaViewShootsPage>
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(height: 12.h),
-                Text(
-                  'Comments:',
-                  style: TextStyle(
-                    color: AppColors.textgrey,
-                    fontSize: 12.sp,
-                  ),
-                ),
-                SizedBox(height: 4.h),
+                SizedBox(height: 16.h),
                 Text(
                   shoot.comments!,
                   style: TextStyle(
                     color: AppColors.textWhite,
-                    fontSize: 14.sp,
+                    fontSize: 13.sp,
                   ),
                 ),
               ],

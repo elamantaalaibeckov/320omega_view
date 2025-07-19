@@ -4,4 +4,6 @@ class AppIcons {
   static const btNavigator3 = 'assets/icons/btnavigationbar3.png';
   static const btNavigator4 = 'assets/icons/btnavigationbar4.png';
   static const deleteshoot = 'assets/icons/deleteshoot.png';
+  static const notficationIcon = 'assets/icons/notfication_icon.png';
+  static const transacktionImage = 'assets/icons/transacktion_image.png';
 }
