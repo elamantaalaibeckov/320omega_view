@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:omega_view_smart_plan_320/presentetion/pages/transaction/screens/add_income_expenses.dart';
 import 'package:omega_view_smart_plan_320/presentetion/themes/app_colors.dart';
 import 'package:omega_view_smart_plan_320/presentetion/themes/app_icons.dart';
 
@@ -102,7 +103,14 @@ class _OmegaViewTransactionPageState extends State<OmegaViewTransactionPage>
             bottom: 16.h,
             right: 16.w,
             child: FloatingActionButton(
-              onPressed: () {},
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const AddTransactionPage(),
+                  ),
+                );
+              },
               backgroundColor: accent,
               child: const Icon(
                 Icons.add,

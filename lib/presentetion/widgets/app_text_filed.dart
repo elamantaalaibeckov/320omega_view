@@ -80,10 +80,10 @@ class _AppTextFieldState extends State<AppTextField> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16.r),
-            borderSide: BorderSide(
-              color: AppColors.mainAccent,
-              width: 1,
-            ),
+            // borderSide: BorderSide(
+            //   color: AppColors.mainAccent,
+            //   width: 1,
+            // ),
           ),
         ),
       ),
