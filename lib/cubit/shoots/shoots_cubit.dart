@@ -20,26 +20,47 @@ class ShootsCubit extends Cubit<ShootsState> {
         isLoading: false,
         errorMessage: e.toString(),
       ));
+      print('Error loading shoots: $e'); // Добавим для отладки
     }
   }
 
   Future<void> addShoot(OmegaShootModel shoot) async {
-    await _service.addShoot(shoot);
-    await loadShoots();
+    try {
+      await _service.addShoot(shoot);
+      await loadShoots();
+    } catch (e) {
+      emit(state.copyWith(errorMessage: 'Failed to add shoot: $e'));
+      print('Error adding shoot: $e');
+    }
   }
 
-  Future<void> updateShoot(int key, OmegaShootModel shoot) async {
-    await _service.updateShoot(key, shoot);
-    await loadShoots();
+  Future<void> updateShoot(String id, OmegaShootModel shoot) async { // Используем String id
+    try {
+      await _service.updateShoot(id, shoot);
+      await loadShoots();
+    } catch (e) {
+      emit(state.copyWith(errorMessage: 'Failed to update shoot: $e'));
+      print('Error updating shoot: $e');
+    }
   }
 
-  Future<void> deleteShoot(int key) async {
-    await _service.deleteShoot(key);
-    await loadShoots();
+  Future<void> deleteShoot(String id) async { // Используем String id
+    try {
+      await _service.deleteShoot(id);
+      await loadShoots();
+    } catch (e) {
+      emit(state.copyWith(errorMessage: 'Failed to delete shoot: $e'));
+      print('Error deleting shoot: $e');
+    }
   }
 
   Future<void> clearAll() async {
-    await _service.clearAll();
-    emit(ShootsState.initial());
+    try {
+      await _service.clearAll();
+      emit(ShootsState.initial());
+    } catch (e) {
+      emit(state.copyWith(errorMessage: 'Failed to clear all shoots: $e'));
+      print('Error clearing all shoots: $e');
+    }
   }
 }

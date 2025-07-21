@@ -16,7 +16,8 @@ class OmegaShootModel extends HiveObject {
   final DateTime date; // Date of the shoot
 
   @HiveField(3)
-  final DateTime time; // Time of the shoot (can be combined with date or stored separately if only time matters)
+  final DateTime
+      time; // Time of the shoot (can be combined with date or stored separately if only time matters)
 
   @HiveField(4)
   final String address; // Address of the shoot location
@@ -28,13 +29,16 @@ class OmegaShootModel extends HiveObject {
   final bool isPlanned; // True if planned, false if completed
 
   @HiveField(7)
-  final List<String> shootReferencesPaths; // Paths to local images for shoot references (XFile.path)
+  final List<String>
+      shootReferencesPaths; // Paths to local images for shoot references (XFile.path)
 
   @HiveField(8)
-  final List<String>? finalShotsPaths; // Paths to local images for final shots (XFile.path), null for planned
+  final List<String>?
+      finalShotsPaths; // Paths to local images for final shots (XFile.path), null for planned
 
   @HiveField(9)
-  final bool? notificationsEnabled; // True if notifications are enabled, null for completed shoots
+  final bool?
+      notificationsEnabled; // True if notifications are enabled, null for completed shoots
 
   OmegaShootModel({
     required this.id,
@@ -44,7 +48,7 @@ class OmegaShootModel extends HiveObject {
     required this.address,
     this.comments,
     required this.isPlanned,
-    this.shootReferencesPaths = const [],
+    this.shootReferencesPaths = const [], // Default to empty list
     this.finalShotsPaths,
     this.notificationsEnabled,
   });
@@ -70,6 +74,7 @@ class OmegaShootModel extends HiveObject {
       isPlanned: true,
       shootReferencesPaths: shootReferencesPaths,
       notificationsEnabled: notificationsEnabled,
+      finalShotsPaths: null, // Planned shoots don't have final shots
     );
   }
 
@@ -94,6 +99,37 @@ class OmegaShootModel extends HiveObject {
       isPlanned: false,
       shootReferencesPaths: shootReferencesPaths,
       finalShotsPaths: finalShotsPaths,
+      notificationsEnabled:
+          null, // Completed shoots don't need notifications enabled
+    );
+  }
+
+  get clientAddress => null;
+
+  // Для удобства при отладке и копировании
+  OmegaShootModel copyWith({
+    String? id,
+    String? clientName,
+    DateTime? date,
+    DateTime? time,
+    String? address,
+    String? comments,
+    bool? isPlanned,
+    List<String>? shootReferencesPaths,
+    List<String>? finalShotsPaths,
+    bool? notificationsEnabled,
+  }) {
+    return OmegaShootModel(
+      id: id ?? this.id,
+      clientName: clientName ?? this.clientName,
+      date: date ?? this.date,
+      time: time ?? this.time,
+      address: address ?? this.address,
+      comments: comments ?? this.comments,
+      isPlanned: isPlanned ?? this.isPlanned,
+      shootReferencesPaths: shootReferencesPaths ?? this.shootReferencesPaths,
+      finalShotsPaths: finalShotsPaths ?? this.finalShotsPaths,
+      notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
     );
   }
 }
