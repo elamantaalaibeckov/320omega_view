@@ -1,11 +1,11 @@
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
 import 'package:omega_view_smart_plan_320/cubit/shoots/shoots_cubit.dart';
-import 'package:omega_view_smart_plan_320/cubit/shoots/shoots_state.dart';
 import 'package:omega_view_smart_plan_320/model/omega_shoot_model.dart';
 import 'package:omega_view_smart_plan_320/presentetion/themes/app_colors.dart';
 import 'package:omega_view_smart_plan_320/presentetion/widgets/app_text.dart';
@@ -68,9 +68,7 @@ class _AddTransactionPageState extends State<AddTransactionPage>
       _commentsController.clear();
       _disposeExpenseItems();
       _expenseItems.clear();
-      if (_tabIndex == 1) {
-        _addExpenseItem();
-      }
+      if (_tabIndex == 1) _addExpenseItem();
     });
   }
 
@@ -88,7 +86,6 @@ class _AddTransactionPageState extends State<AddTransactionPage>
     for (var item in _expenseItems) item.dispose();
   }
 
-  /// Adds a new ExpenseItem only if the last one is fully filled.
   void _addExpenseItem() {
     if (_expenseItems.isNotEmpty) {
       final last = _expenseItems.last;
@@ -135,7 +132,6 @@ class _AddTransactionPageState extends State<AddTransactionPage>
       _showSnackBar('Пожалуйста, выберите съемку.', Colors.red);
       return;
     }
-
     if (_tabIndex == 0) {
       final amount = double.tryParse(_incomeAmountController.text);
       if (amount == null || amount <= 0) {
@@ -157,7 +153,6 @@ class _AddTransactionPageState extends State<AddTransactionPage>
         debugPrint('  • ${e.nameController.text}: ${e.priceController.text}');
       }
     }
-
     Navigator.pop(context);
     _showSnackBar('Транзакция успешно добавлена!', AppColors.mainAccent);
   }
@@ -250,10 +245,14 @@ class _AddTransactionPageState extends State<AddTransactionPage>
     );
   }
 
-  /// Shows shoot date + address.
   Widget _buildSelectedShoot(OmegaShootModel shoot) {
-    final dt = DateTime(shoot.date.year, shoot.date.month, shoot.date.day,
-        shoot.time.hour, shoot.time.minute);
+    final dt = DateTime(
+      shoot.date.year,
+      shoot.date.month,
+      shoot.date.day,
+      shoot.time.hour,
+      shoot.time.minute,
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -311,13 +310,139 @@ class _AddTransactionPageState extends State<AddTransactionPage>
         AppTexts(texTs: 'Select Shoot'),
         SizedBox(height: 8.h),
         _buildShootPickerButton(),
-        if (_isShootPickerOpen) _buildShootList(shoots, isExpanded: true),
+
+        // список съёмок с BouncingScrollPhysics
+        if (_isShootPickerOpen)
+          Padding(
+            padding: EdgeInsets.only(top: 16.h),
+            child: Container(
+              height: 288.h,
+              decoration: BoxDecoration(
+                color: AppColors.filedGrey,
+                borderRadius: BorderRadius.circular(16.r),
+              ),
+              child: ListView.separated(
+                shrinkWrap: true,
+                physics: const BouncingScrollPhysics(),
+                padding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 16.w),
+                itemCount: shoots.length,
+                separatorBuilder: (_, __) => SizedBox(height: 12.h),
+                itemBuilder: (context, i) {
+                  final shoot = shoots[i];
+                  final isSel = _selectedShoot?.id == shoot.id;
+                  final dt = DateTime(shoot.date.year, shoot.date.month,
+                      shoot.date.day, shoot.time.hour, shoot.time.minute);
+                  File? preview;
+                  final photos = shoot.finalShotsPaths ?? [];
+                  if (photos.isNotEmpty) {
+                    final f = File(photos.first);
+                    if (f.existsSync()) preview = f;
+                  }
+                  return InkWell(
+                    onTap: () => setState(() {
+                      _selectedShoot = shoot;
+                      _isShootPickerOpen = false;
+                    }),
+                    borderRadius: BorderRadius.circular(16.r),
+                    child: Container(
+                      height: 80.h,
+                      padding: EdgeInsets.symmetric(horizontal: 12.w),
+                      decoration: BoxDecoration(
+                        color: AppColors.cardGrey,
+                        borderRadius: BorderRadius.circular(16.r),
+                        border: Border.all(
+                          color:
+                              isSel ? AppColors.mainAccent : AppColors.cardGrey,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  DateFormat('MMM d, yyyy, h:mm a').format(dt),
+                                  style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 14.sp,
+                                      fontWeight: FontWeight.w500),
+                                ),
+                                SizedBox(height: 4.h),
+                                Text(
+                                  shoot.clientName,
+                                  style: TextStyle(
+                                      color: AppColors.textgrey,
+                                      fontSize: 14.sp),
+                                ),
+                              ],
+                            ),
+                          ),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8.r),
+                            child: preview != null
+                                ? Image.file(preview,
+                                    width: 40.w,
+                                    height: 40.h,
+                                    fit: BoxFit.cover)
+                                : Container(
+                                    width: 40.w,
+                                    height: 40.h,
+                                    decoration: BoxDecoration(
+                                      color:
+                                          AppColors.textgrey.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(8.r),
+                                    ),
+                                    child: Icon(
+                                      photos.isNotEmpty
+                                          ? Icons.broken_image
+                                          : Icons.no_photography_outlined,
+                                      color: AppColors.textgrey,
+                                      size: 24.r,
+                                    ),
+                                  ),
+                          ),
+                          if (photos.length > 1)
+                            Padding(
+                              padding: EdgeInsets.only(left: 8.w),
+                              child: Container(
+                                width: 40.w,
+                                height: 40.h,
+                                decoration: BoxDecoration(
+                                  color: AppColors.grey2,
+                                  borderRadius: BorderRadius.circular(8.r),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    '+${photos.length - 1}',
+                                    style: TextStyle(
+                                      color: AppColors.textWhite,
+                                      fontSize: 14.sp,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+
         SizedBox(height: 16.h),
         AppTexts(texTs: 'Expenses'),
         SizedBox(height: 8.h),
+
+        // список полей расходов с BouncingScrollPhysics
         ListView.builder(
           shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
+          physics: const BouncingScrollPhysics(),
           itemCount: _expenseItems.length,
           itemBuilder: (context, idx) {
             final e = _expenseItems[idx];
@@ -376,6 +501,7 @@ class _AddTransactionPageState extends State<AddTransactionPage>
             );
           },
         ),
+
         SizedBox(height: 16.h),
         SizedBox(
           width: double.infinity,
@@ -394,6 +520,7 @@ class _AddTransactionPageState extends State<AddTransactionPage>
                     fontWeight: FontWeight.w600)),
           ),
         ),
+
         SizedBox(height: 16.h),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -410,6 +537,7 @@ class _AddTransactionPageState extends State<AddTransactionPage>
                     fontWeight: FontWeight.w600)),
           ],
         ),
+
         SizedBox(height: 16.h),
         AppTexts(texTs: 'Comments (optional)'),
         SizedBox(height: 8.h),
@@ -422,7 +550,6 @@ class _AddTransactionPageState extends State<AddTransactionPage>
     );
   }
 
-  /// Custom dropdown button: shows date+address, image preview, toggle arrow.
   Widget _buildShootPickerButton() {
     return GestureDetector(
       onTap: () => setState(() => _isShootPickerOpen = !_isShootPickerOpen),
@@ -475,33 +602,39 @@ class _AddTransactionPageState extends State<AddTransactionPage>
 
   Widget _buildShootList(List<OmegaShootModel> shoots,
       {bool isExpanded = false}) {
+    final visibleCount = isExpanded ? shoots.length : min(shoots.length, 3);
+    final itemHeight = 80.h;
+    final separator = 12.h;
+    final totalHeight =
+        visibleCount * itemHeight + max(0, visibleCount - 1) * separator + 24.h;
+
     return Padding(
       padding: EdgeInsets.only(top: 16.h),
       child: Container(
-        height: isExpanded ? null : 288.h,
+        height: isExpanded ? null : totalHeight,
         decoration: BoxDecoration(
           color: AppColors.filedGrey,
           borderRadius: BorderRadius.circular(16.r),
         ),
         child: ListView.separated(
           shrinkWrap: isExpanded,
-          physics: isExpanded ? const NeverScrollableScrollPhysics() : null,
+          physics: isExpanded
+              ? const NeverScrollableScrollPhysics()
+              : const BouncingScrollPhysics(),
           padding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 16.w),
           itemCount: shoots.length,
-          separatorBuilder: (_, __) => SizedBox(height: 12.h),
+          separatorBuilder: (_, __) => SizedBox(height: separator),
           itemBuilder: (context, i) {
             final shoot = shoots[i];
             final isSel = _selectedShoot?.id == shoot.id;
             final dt = DateTime(shoot.date.year, shoot.date.month,
                 shoot.date.day, shoot.time.hour, shoot.time.minute);
-
-            final photos = shoot.finalShotsPaths ?? [];
             File? preview;
+            final photos = shoot.finalShotsPaths ?? [];
             if (photos.isNotEmpty) {
               final f = File(photos.first);
               if (f.existsSync()) preview = f;
             }
-
             return InkWell(
               onTap: () => setState(() {
                 _selectedShoot = shoot;
@@ -509,7 +642,7 @@ class _AddTransactionPageState extends State<AddTransactionPage>
               }),
               borderRadius: BorderRadius.circular(16.r),
               child: Container(
-                height: 80.h,
+                height: itemHeight,
                 padding: EdgeInsets.symmetric(horizontal: 12.w),
                 decoration: BoxDecoration(
                   color: AppColors.cardGrey,
