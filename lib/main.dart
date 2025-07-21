@@ -6,38 +6,36 @@ import 'package:path_provider/path_provider.dart';
 
 import 'package:omega_view_smart_plan_320/presentetion/pages/omega_bottomnavigation_bar.dart';
 import 'package:omega_view_smart_plan_320/presentetion/themes/app_colors.dart';
-import 'model/service/shoots_hive_service.dart'; // <--- ДОБАВЛЕН ЭТОТ ИМПОРТ
+
+// Сервисы Hive
+import 'model/service/shoots_hive_service.dart';
 import 'model/service/transaction_hive_service.dart';
+
+// Cубиты
 import 'cubit/shoots/shoots_cubit.dart';
 import 'cubit/transactions/transactions_cubit.dart';
+
+// Модели
 import 'model/omega_shoot_model.dart';
 import 'model/omega_transaction_model.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Получаем путь к директории приложения
   final appDocumentDir = await getApplicationDocumentsDirectory();
+  // Инициализируем Hive с этим путём
   await Hive.initFlutter(appDocumentDir.path);
 
-  // --- ВАЖНО: Регистрация адаптеров Hive ---
+  // Регистрируем адаптеры (типId 0 — для съёмок, 1 — для транзакций)
   if (!Hive.isAdapterRegistered(0)) {
-    Hive.registerAdapter(
-        OmegaShootModelAdapter()); // ТОЛЬКО ЭТОТ АДАПТЕР для OmegaShootModel
+    Hive.registerAdapter(OmegaShootModelAdapter());
   }
   if (!Hive.isAdapterRegistered(1)) {
     Hive.registerAdapter(OmegaTransactionModelAdapter());
   }
-  // Убедитесь, что здесь НЕТ строки Hive.registerAdapter(OmegaShootModelV2Adapter());
-  // И удалите import 'package:omega_view_smart_plan_320/model/omega_shoot_model_adapter_v2.dart'; из этого файла!
 
-  // Опционально: Удаление боксов для чистого старта (раскомментируйте, если нужно сбросить данные)
-  // try {
-  //   await Hive.deleteBoxFromDisk('shootsBox');
-  //   await Hive.deleteBoxFromDisk('transactionsBox');
-  // } catch (e) {
-  //   print('Error deleting Hive boxes on startup: $e');
-  // }
-
+  // Открываем боксы
   await ShootsHiveService.init();
   await TransactionHiveService.init();
 

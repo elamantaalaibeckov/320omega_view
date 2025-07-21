@@ -6,7 +6,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
 import 'package:omega_view_smart_plan_320/cubit/shoots/shoots_cubit.dart';
+import 'package:omega_view_smart_plan_320/cubit/transactions/transactions_cubit.dart';
 import 'package:omega_view_smart_plan_320/model/omega_shoot_model.dart';
+import 'package:omega_view_smart_plan_320/model/omega_transaction_model.dart';
 import 'package:omega_view_smart_plan_320/presentetion/themes/app_colors.dart';
 import 'package:omega_view_smart_plan_320/presentetion/widgets/app_text.dart';
 import 'package:omega_view_smart_plan_320/presentetion/widgets/app_text_filed.dart';
@@ -127,32 +129,52 @@ class _AddTransactionPageState extends State<AddTransactionPage>
     });
   }
 
-  void _addTransaction() {
+  Future<void> _addTransaction() async {
     if (_selectedShoot == null) {
       _showSnackBar('Пожалуйста, выберите съемку.', Colors.red);
       return;
     }
+
+    final transactionsCubit = context.read<TransactionsCubit>();
+
     if (_tabIndex == 0) {
-      final amount = double.tryParse(_incomeAmountController.text);
-      if (amount == null || amount <= 0) {
+      // Income
+      final amount = double.tryParse(_incomeAmountController.text) ?? 0;
+      if (amount <= 0) {
         _showSnackBar('Введите корректную сумму дохода.', Colors.red);
         return;
       }
-      debugPrint(
-          'Adding Income: Amount=$amount, Shoot ID=${_selectedShoot!.id}');
+
+      final tx = OmegaTransactionModel(
+        id: _uuid.v4(),
+        shootId: _selectedShoot!.id,
+        amount: amount,
+        category: 'Income',
+        date: DateTime.now(),
+        note:
+            _commentsController.text.isEmpty ? null : _commentsController.text,
+      );
+
+      await transactionsCubit.addTransaction(tx);
     } else {
-      if (_expenseItems.any((item) =>
-          item.nameController.text.trim().isEmpty ||
-          double.tryParse(item.priceController.text) == null ||
-          (double.tryParse(item.priceController.text) ?? 0) <= 0)) {
-        _showSnackBar('Заполните все поля расходов корректно.', Colors.red);
-        return;
-      }
-      debugPrint('Adding Expenses for shoot ${_selectedShoot!.id}:');
-      for (var e in _expenseItems) {
-        debugPrint('  • ${e.nameController.text}: ${e.priceController.text}');
+      // Expenses: создаём отдельную транзакцию на каждую статью расхода
+      for (var item in _expenseItems) {
+        final name = item.nameController.text.trim();
+        final price = double.tryParse(item.priceController.text) ?? 0;
+        if (name.isEmpty || price <= 0) continue;
+
+        final tx = OmegaTransactionModel(
+          id: _uuid.v4(),
+          shootId: _selectedShoot!.id,
+          amount: price,
+          category: 'Expense',
+          date: DateTime.now(),
+          note: name,
+        );
+        await transactionsCubit.addTransaction(tx);
       }
     }
+
     Navigator.pop(context);
     _showSnackBar('Транзакция успешно добавлена!', AppColors.mainAccent);
   }

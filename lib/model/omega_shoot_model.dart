@@ -132,4 +132,17 @@ class OmegaShootModel extends HiveObject {
       notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
     );
   }
+
+  factory OmegaShootModel.empty() => OmegaShootModel(
+        id: '',
+        clientName: '',
+        date: DateTime.now(),
+        time: DateTime.now(),
+        address: '',
+        comments: null,
+        isPlanned: false,
+        shootReferencesPaths: const [],
+        finalShotsPaths: const [],
+        notificationsEnabled: false,
+      );
 }

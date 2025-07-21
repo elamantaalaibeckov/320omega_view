@@ -4,13 +4,13 @@ import 'package:hive/hive.dart';
 
 part 'omega_transaction_model.g.dart';
 
-@HiveType(typeId: 1) // Изменено на typeId: 1
+@HiveType(typeId: 1)
 class OmegaTransactionModel extends HiveObject {
   @HiveField(0)
   final String id;
 
   @HiveField(1)
-  final String shootId; // Добавлено для связи со съемкой
+  final String shootId;
   @HiveField(2)
   final double amount;
   @HiveField(3)
@@ -18,15 +18,18 @@ class OmegaTransactionModel extends HiveObject {
   @HiveField(4)
   final DateTime date;
   @HiveField(5)
-  final String? note; // Сделано nullable
+  final String? note;
+  @HiveField(6) // Добавляем новое поле description
+  final String? description; // Например, "Light", "Camera Rental"
 
   OmegaTransactionModel({
     required this.id,
-    required this.shootId, // Добавлено
+    required this.shootId,
     required this.amount,
     required this.category,
     required this.date,
-    this.note, // Сделано nullable
+    this.note,
+    this.description, // Добавляем в конструктор
   });
 
   OmegaTransactionModel copyWith({
@@ -36,6 +39,7 @@ class OmegaTransactionModel extends HiveObject {
     String? category,
     DateTime? date,
     String? note,
+    String? description, // Добавляем в copyWith
   }) {
     return OmegaTransactionModel(
       id: id ?? this.id,
@@ -44,6 +48,7 @@ class OmegaTransactionModel extends HiveObject {
       category: category ?? this.category,
       date: date ?? this.date,
       note: note ?? this.note,
+      description: description ?? this.description, // Добавляем в copyWith
     );
   }
 }
