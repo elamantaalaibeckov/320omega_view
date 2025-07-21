@@ -14,7 +14,7 @@ import 'package:omega_view_smart_plan_320/presentetion/widgets/app_text.dart';
 import 'package:omega_view_smart_plan_320/presentetion/widgets/app_text_filed.dart';
 import 'package:uuid/uuid.dart';
 
-/// Represents a single expense item with its name and price controllers.
+/// Для одного поля расхода
 class ExpenseItem {
   final String id;
   final TextEditingController nameController;
@@ -32,9 +32,17 @@ class ExpenseItem {
   }
 }
 
-/// A page for adding income or expense transactions related to shoots.
+/// Страница добавления/редактирования транзакции
 class AddTransactionPage extends StatefulWidget {
-  const AddTransactionPage({Key? key}) : super(key: key);
+  /// Если передаём existing, то работаем в режиме редактирования
+  final OmegaTransactionModel? initialTx;
+  final OmegaShootModel? initialShoot;
+
+  const AddTransactionPage({
+    Key? key,
+    this.initialTx,
+    this.initialShoot,
+  }) : super(key: key);
 
   @override
   State<AddTransactionPage> createState() => _AddTransactionPageState();
@@ -43,22 +51,64 @@ class AddTransactionPage extends StatefulWidget {
 class _AddTransactionPageState extends State<AddTransactionPage>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
+  bool _isDirty = false; // флаг изменений
   int _tabIndex = 0;
 
   OmegaShootModel? _selectedShoot;
+  final TextEditingController _incomeAmountController = TextEditingController();
   final TextEditingController _commentsController = TextEditingController();
   bool _isShootPickerOpen = false;
-  final TextEditingController _incomeAmountController = TextEditingController();
 
   final List<ExpenseItem> _expenseItems = [];
   final Uuid _uuid = const Uuid();
 
+  bool get _isEditing => widget.initialTx != null;
+
   @override
   void initState() {
     super.initState();
+    // Если редактируем, префилл контроллеров
+    if (_isEditing) {
+      final tx = widget.initialTx!;
+      _selectedShoot = widget.initialShoot;
+      if (tx.category == 'Income') {
+        _tabIndex = 0;
+        _incomeAmountController.text = tx.amount.toStringAsFixed(0);
+        _commentsController.text = tx.note ?? '';
+      } else {
+        _tabIndex = 1;
+        _expenseItems.add(
+          ExpenseItem(
+            id: _uuid.v4(),
+            nameController: TextEditingController(text: tx.note),
+            priceController:
+                TextEditingController(text: tx.amount.toStringAsFixed(0)),
+          ),
+        );
+      }
+    } else {
+      // при добавлении в расходах создаём пустой item
+      _expenseItems.add(
+        ExpenseItem(
+          id: _uuid.v4(),
+          nameController: TextEditingController(),
+          priceController: TextEditingController(),
+        ),
+      );
+    }
+
+    // слушатели для dirty‑флага
+    _incomeAmountController.addListener(_markDirty);
+    _commentsController.addListener(_markDirty);
+
     _tabController = TabController(length: 2, vsync: this)
       ..addListener(_handleTabSelection);
+
     context.read<ShootsCubit>().loadShoots();
+  }
+
+  void _markDirty([_]) {
+    if (!_isDirty) setState(() => _isDirty = true);
   }
 
   void _handleTabSelection() {
@@ -71,6 +121,7 @@ class _AddTransactionPageState extends State<AddTransactionPage>
       _disposeExpenseItems();
       _expenseItems.clear();
       if (_tabIndex == 1) _addExpenseItem();
+      _isDirty = true;
     });
   }
 
@@ -89,6 +140,7 @@ class _AddTransactionPageState extends State<AddTransactionPage>
   }
 
   void _addExpenseItem() {
+    // валидируем предыдущий
     if (_expenseItems.isNotEmpty) {
       final last = _expenseItems.last;
       if (last.nameController.text.trim().isEmpty ||
@@ -104,10 +156,11 @@ class _AddTransactionPageState extends State<AddTransactionPage>
       _expenseItems.add(
         ExpenseItem(
           id: _uuid.v4(),
-          nameController: TextEditingController(),
-          priceController: TextEditingController(),
+          nameController: TextEditingController()..addListener(_markDirty),
+          priceController: TextEditingController()..addListener(_markDirty),
         ),
       );
+      _isDirty = true;
     });
   }
 
@@ -118,6 +171,7 @@ class _AddTransactionPageState extends State<AddTransactionPage>
         _expenseItems[idx].dispose();
         _expenseItems.removeAt(idx);
         if (_expenseItems.isEmpty) _addExpenseItem();
+        _isDirty = true;
       }
     });
   }
@@ -129,13 +183,18 @@ class _AddTransactionPageState extends State<AddTransactionPage>
     });
   }
 
-  Future<void> _addTransaction() async {
+  Future<void> _saveTransaction() async {
     if (_selectedShoot == null) {
-      _showSnackBar('Пожалуйста, выберите съемку.', Colors.red);
+      _showSnackBar('Пожалуйста, выберите съёмку.', Colors.red);
       return;
     }
 
-    final transactionsCubit = context.read<TransactionsCubit>();
+    final cubit = context.read<TransactionsCubit>();
+
+    // Если мы в режиме редактирования — удаляем старую запись
+    if (_isEditing) {
+      await cubit.deleteTransaction(widget.initialTx!.id);
+    }
 
     if (_tabIndex == 0) {
       // Income
@@ -144,7 +203,6 @@ class _AddTransactionPageState extends State<AddTransactionPage>
         _showSnackBar('Введите корректную сумму дохода.', Colors.red);
         return;
       }
-
       final tx = OmegaTransactionModel(
         id: _uuid.v4(),
         shootId: _selectedShoot!.id,
@@ -154,15 +212,13 @@ class _AddTransactionPageState extends State<AddTransactionPage>
         note:
             _commentsController.text.isEmpty ? null : _commentsController.text,
       );
-
-      await transactionsCubit.addTransaction(tx);
+      await cubit.addTransaction(tx);
     } else {
-      // Expenses: создаём отдельную транзакцию на каждую статью расхода
+      // Expenses: по одной транзакции на каждую статью расхода
       for (var item in _expenseItems) {
         final name = item.nameController.text.trim();
         final price = double.tryParse(item.priceController.text) ?? 0;
         if (name.isEmpty || price <= 0) continue;
-
         final tx = OmegaTransactionModel(
           id: _uuid.v4(),
           shootId: _selectedShoot!.id,
@@ -171,12 +227,70 @@ class _AddTransactionPageState extends State<AddTransactionPage>
           date: DateTime.now(),
           note: name,
         );
-        await transactionsCubit.addTransaction(tx);
+        await cubit.addTransaction(tx);
       }
     }
 
-    Navigator.pop(context);
-    _showSnackBar('Транзакция успешно добавлена!', AppColors.mainAccent);
+    Navigator.of(context).pop();
+    _showSnackBar(
+      _isEditing ? 'Транзакция обновлена!' : 'Транзакция успешно добавлена!',
+      AppColors.mainAccent,
+    );
+  }
+
+  Future<void> _confirmDelete() async {
+    final confirm = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (_) => CupertinoAlertDialog(
+        title: Text('Delete Transaction?', style: TextStyle(fontSize: 17.sp)),
+        content: Text(
+          'If you delete this transaction, you will not be able to recover it.',
+          style: TextStyle(fontSize: 13.sp),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            child: Text('Cancel'),
+            onPressed: () => Navigator.of(context).pop(false),
+          ),
+          CupertinoDialogAction(
+            child: Text('Delete', style: TextStyle(color: Colors.red)),
+            onPressed: () => Navigator.of(context).pop(true),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      await context
+          .read<TransactionsCubit>()
+          .deleteTransaction(widget.initialTx!.id);
+      Navigator.of(context).pop();
+      _showSnackBar('Транзакция удалена', AppColors.mainAccent);
+    }
+  }
+
+  Future<bool> _onWillPop() async {
+    if (!_isDirty) return true;
+    final leave = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (_) => CupertinoAlertDialog(
+        title: Text('Leave the page?', style: TextStyle(fontSize: 17.sp)),
+        content: Text(
+          'You have unsaved changes. Are you sure you want to leave?',
+          style: TextStyle(fontSize: 13.sp),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            child: Text('Cancel'),
+            onPressed: () => Navigator.of(context).pop(false),
+          ),
+          CupertinoDialogAction(
+            child: Text('Leave', style: TextStyle(fontWeight: FontWeight.w600)),
+            onPressed: () => Navigator.of(context).pop(true),
+          ),
+        ],
+      ),
+    );
+    return leave ?? false;
   }
 
   void _showSnackBar(String msg, Color bg) {
@@ -194,75 +308,89 @@ class _AddTransactionPageState extends State<AddTransactionPage>
         .where((s) => !s.isPlanned)
         .toList();
 
-    return Scaffold(
-      backgroundColor: AppColors.bgColor,
-      appBar: AppBar(
-        backgroundColor: AppColors.bottomNavigatorAppBarColor,
-        elevation: 0,
-        leading: const BackButton(color: Colors.white),
-        title: Text('Add Transaction',
+    return WillPopScope(
+      onWillPop: _onWillPop,
+      child: Scaffold(
+        backgroundColor: AppColors.bgColor,
+        appBar: AppBar(
+          backgroundColor: AppColors.bottomNavigatorAppBarColor,
+          elevation: 0,
+          leading: const BackButton(color: Colors.white),
+          title: Text(
+            _isEditing ? 'Edit Transaction' : 'Add Transaction',
             style: TextStyle(
                 color: Colors.white,
                 fontSize: 20.sp,
-                fontWeight: FontWeight.w500)),
-        centerTitle: true,
-      ),
-      body: Stack(
-        children: [
-          Padding(
-            padding: EdgeInsets.only(bottom: 80.h),
-            child: Column(
-              children: [
-                Padding(
-                  padding:
-                      EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-                  child: TabBar(
-                    controller: _tabController,
-                    indicator: BoxDecoration(
-                      border: Border.all(color: accent, width: 1.5),
-                      borderRadius: BorderRadius.circular(16.r),
-                    ),
-                    indicatorSize: TabBarIndicatorSize.tab,
-                    labelColor: AppColors.textWhite,
-                    unselectedLabelColor: AppColors.textgrey,
-                    labelStyle:
-                        TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w500),
-                    tabs: const [Tab(text: 'Income'), Tab(text: 'Expenses')],
-                  ),
-                ),
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: EdgeInsets.symmetric(horizontal: 16.w),
-                    child: _tabIndex == 0
-                        ? _buildIncomeForm(shoots)
-                        : _buildExpensesForm(shoots),
-                  ),
-                ),
-              ],
-            ),
+                fontWeight: FontWeight.w500),
           ),
-          Positioned(
-            bottom: 16.h,
-            left: 16.w,
-            right: 16.w,
-            child: SizedBox(
-              height: 52.h,
-              child: ElevatedButton(
-                onPressed: _addTransaction,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: accent,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30.r)),
-                ),
-                child: Text('Add',
+          centerTitle: true,
+          actions: [
+            if (_isEditing)
+              IconButton(
+                icon: Icon(Icons.delete_outline, color: Colors.white),
+                onPressed: _confirmDelete,
+              ),
+          ],
+        ),
+        body: Stack(
+          children: [
+            Padding(
+              padding: EdgeInsets.only(bottom: 80.h),
+              child: Column(
+                children: [
+                  Padding(
+                    padding:
+                        EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                    child: TabBar(
+                      controller: _tabController,
+                      indicator: BoxDecoration(
+                        border: Border.all(color: accent, width: 1.5),
+                        borderRadius: BorderRadius.circular(16.r),
+                      ),
+                      indicatorSize: TabBarIndicatorSize.tab,
+                      labelColor: AppColors.textWhite,
+                      unselectedLabelColor: AppColors.textgrey,
+                      labelStyle: TextStyle(
+                          fontSize: 14.sp, fontWeight: FontWeight.w500),
+                      tabs: const [Tab(text: 'Income'), Tab(text: 'Expenses')],
+                    ),
+                  ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: EdgeInsets.symmetric(horizontal: 16.w),
+                      child: _tabIndex == 0
+                          ? _buildIncomeForm(shoots)
+                          : _buildExpensesForm(shoots),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Positioned(
+              bottom: 16.h,
+              left: 16.w,
+              right: 16.w,
+              child: SizedBox(
+                height: 52.h,
+                child: ElevatedButton(
+                  onPressed: _saveTransaction,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: accent,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30.r)),
+                  ),
+                  child: Text(
+                    _isEditing ? 'Save' : 'Add',
                     style: TextStyle(
                         color: Colors.white,
                         fontSize: 16.sp,
-                        fontWeight: FontWeight.w600)),
+                        fontWeight: FontWeight.w600),
+                  ),
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

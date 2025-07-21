@@ -1,3 +1,5 @@
+// lib/presentation/pages/shoots/screens/planned_add_shoot.dart
+
 import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -6,13 +8,10 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:uuid/uuid.dart'; // Add uuid for unique IDs
+import 'package:uuid/uuid.dart';
 
-// Cubit and Model imports
 import 'package:omega_view_smart_plan_320/cubit/shoots/shoots_cubit.dart';
 import 'package:omega_view_smart_plan_320/model/omega_shoot_model.dart';
-
-// Your custom widget imports
 import 'package:omega_view_smart_plan_320/presentetion/pages/shoots/screens/cupertino_date_picker.dart';
 import 'package:omega_view_smart_plan_320/presentetion/themes/app_colors.dart';
 import 'package:omega_view_smart_plan_320/presentetion/themes/app_icons.dart';
@@ -20,7 +19,9 @@ import 'package:omega_view_smart_plan_320/presentetion/widgets/app_text.dart';
 import 'package:omega_view_smart_plan_320/presentetion/widgets/app_text_filed.dart';
 
 class PlannedAddShoot extends StatefulWidget {
-  const PlannedAddShoot({Key? key}) : super(key: key);
+  /// If not null, we are in edit mode
+  final OmegaShootModel? editShoot;
+  const PlannedAddShoot({Key? key, this.editShoot}) : super(key: key);
 
   @override
   State<PlannedAddShoot> createState() => _PlannedAddShootState();
@@ -28,58 +29,90 @@ class PlannedAddShoot extends StatefulWidget {
 
 class _PlannedAddShootState extends State<PlannedAddShoot>
     with SingleTickerProviderStateMixin {
-  // Planned for own date/time variables
-  DateTime _plannedSelectedDate = DateTime.now();
-  DateTime _plannedSelectedTime = DateTime(
-    0,
-    0,
-    0,
-    TimeOfDay.now().hour,
-    TimeOfDay.now().minute,
-  );
+  // for dirty mode
+  bool _isDirty = false;
 
-  // Completed for own date/time variables
-  DateTime _completedSelectedDate = DateTime.now();
-  DateTime _completedSelectedTime = DateTime(
-    0,
-    0,
-    0,
-    TimeOfDay.now().hour,
-    TimeOfDay.now().minute,
-  );
-
+  // tab controller
   late final TabController _tc;
-  bool _notify = false;
 
-  // PICK FLAGS
+  // Planned fields
+  DateTime _plannedSelectedDate = DateTime.now();
+  DateTime _plannedSelectedTime =
+      DateTime(0, 0, 0, TimeOfDay.now().hour, TimeOfDay.now().minute);
   bool _plannedDatePicked = false;
   bool _plannedTimePicked = false;
-  bool _completedDatePicked = false;
-  bool _completedTimePicked = false;
-
-  // TEXT CONTROLLERS
   final _plannedClientNameCtrl = TextEditingController();
   final _plannedAddressCtrl = TextEditingController();
-  final _plannedCommentsCtrl =
-      TextEditingController(); // Added comments controller
+  final _plannedCommentsCtrl = TextEditingController();
+  bool _notify = false;
 
+  // Completed fields
+  DateTime _completedSelectedDate = DateTime.now();
+  DateTime _completedSelectedTime =
+      DateTime(0, 0, 0, TimeOfDay.now().hour, TimeOfDay.now().minute);
+  bool _completedDatePicked = false;
+  bool _completedTimePicked = false;
   final _completedClientNameCtrl = TextEditingController();
   final _completedAddressCtrl = TextEditingController();
-  final _completedCommentsCtrl =
-      TextEditingController(); // Added comments controller
+  final _completedCommentsCtrl = TextEditingController();
 
-  // PHOTO LISTS
+  // photos
   final List<XFile> _refPhotos = [];
   final List<XFile> _finalShots = [];
   static const int _maxPhotos = 17;
   final ImagePicker _picker = ImagePicker();
-  final Uuid _uuid = const Uuid(); // Initialize Uuid
+  final Uuid _uuid = const Uuid();
 
   @override
   void initState() {
     super.initState();
     _tc = TabController(length: 2, vsync: this)
       ..addListener(() => setState(() {}));
+
+    // if editShoot is passed - fill fields
+    if (widget.editShoot != null) {
+      final s = widget.editShoot!;
+      _tc.index = s.isPlanned ? 0 : 1;
+
+      // Planned
+      _plannedSelectedDate = s.date;
+      _plannedDatePicked = true;
+      _plannedSelectedTime = s.time;
+      _plannedTimePicked = true;
+      _plannedClientNameCtrl.text = s.clientName;
+      _plannedAddressCtrl.text = s.address;
+      if (s.comments != null) _plannedCommentsCtrl.text = s.comments!;
+      if (s.shootReferencesPaths.isNotEmpty) {
+        _refPhotos.addAll(
+          s.shootReferencesPaths.map((p) => XFile(p)),
+        );
+      }
+      _notify = s.notificationsEnabled ?? false;
+
+      // Completed
+      _completedSelectedDate = s.date;
+      _completedDatePicked = true;
+      _completedSelectedTime = s.time;
+      _completedTimePicked = true;
+      _completedClientNameCtrl.text = s.clientName;
+      _completedAddressCtrl.text = s.address;
+      if (s.comments != null) _completedCommentsCtrl.text = s.comments!;
+      if (s.finalShotsPaths != null) {
+        _finalShots.addAll(
+          s.finalShotsPaths!.map((p) => XFile(p)),
+        );
+      }
+    }
+
+    // listen for changes to mark dirty
+    [
+      _plannedClientNameCtrl,
+      _plannedAddressCtrl,
+      _plannedCommentsCtrl,
+      _completedClientNameCtrl,
+      _completedAddressCtrl,
+      _completedCommentsCtrl
+    ].forEach((c) => c.addListener(() => _isDirty = true));
   }
 
   @override
@@ -94,35 +127,69 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
     super.dispose();
   }
 
-  void _showPermissionDialog() {
-    showDialog(
+  // prompt when exiting without saving
+  Future<bool> _onWillPop() async {
+    if (!_isDirty) return true;
+    final bool? confirmExit = await showCupertinoDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Access to Photos Denied'),
-        content: const Text(
-          'Allow access in Settings to add images of your shoot references and final shots.',
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel')),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              openAppSettings();
-            },
-            child: const Text('Settings'),
+      builder: (BuildContext ctx) {
+        return CupertinoAlertDialog(
+          title: Text(
+            'Leave the page?',
+            style: TextStyle(
+                color: Colors.black,
+                fontSize: 17.sp,
+                fontWeight: FontWeight.w600),
           ),
-        ],
-      ),
+          content: Text(
+            'Are you sure you want to get out? These transaction changes will not be saved',
+            style: TextStyle(color: Colors.black, fontSize: 13.sp),
+          ),
+          actions: <Widget>[
+            CupertinoDialogAction(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text('Cancel',
+                  style:
+                      TextStyle(color: AppColors.mainAccent, fontSize: 17.sp)),
+            ),
+            CupertinoDialogAction(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text('Leave',
+                  style: TextStyle(
+                      color: AppColors.mainAccent,
+                      fontSize: 17.sp,
+                      fontWeight: FontWeight.w600)),
+            ),
+          ],
+        );
+      },
     );
+    return confirmExit ?? false;
   }
 
+  // photo selection dialog
   Future<void> _pickPhotos(List<XFile> targetList) async {
+    _isDirty = true;
     final status = await Permission.photos.request();
     if (!status.isGranted) {
-      _showPermissionDialog();
-      return;
+      return showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Access to photos denied'),
+          content: const Text('Allow access in settings to add photos.'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel')),
+            TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  openAppSettings();
+                },
+                child: const Text('Settings')),
+          ],
+        ),
+      );
     }
     final picked = await _picker.pickMultiImage();
     if (picked != null && picked.isNotEmpty) {
@@ -133,41 +200,85 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
     }
   }
 
-  void _removePhoto(List<XFile> list, int i) =>
-      setState(() => list.removeAt(i));
+  void _removePhoto(List<XFile> list, int i) {
+    _isDirty = true;
+    setState(() => list.removeAt(i));
+  }
 
-  void _addPlannedShoot() {
-    final newShoot = OmegaShootModel.planned(
-      id: _uuid.v4(), // Generate a unique ID
-      clientName: _plannedClientNameCtrl.text,
-      date: _plannedSelectedDate,
-      time: _plannedSelectedTime,
-      address: _plannedAddressCtrl.text,
-      comments: _plannedCommentsCtrl.text.isNotEmpty
-          ? _plannedCommentsCtrl.text
-          : null,
-      shootReferencesPaths: _refPhotos.map((xfile) => xfile.path).toList(),
-      notificationsEnabled: _notify,
-    );
-    context.read<ShootsCubit>().addShoot(newShoot);
+  // save or update
+  void _saveShoot() {
+    final isPlanned = _tc.index == 0;
+    final id =
+        widget.editShoot?.id ?? const Uuid().v4(); // Corrected Uuid usage
+    final model = isPlanned
+        ? OmegaShootModel.planned(
+            id: id,
+            clientName: _plannedClientNameCtrl.text,
+            date: _plannedSelectedDate,
+            time: _plannedSelectedTime,
+            address: _plannedAddressCtrl.text,
+            comments: _plannedCommentsCtrl.text.isNotEmpty
+                ? _plannedCommentsCtrl.text
+                : null,
+            shootReferencesPaths: _refPhotos.map((x) => x.path).toList(),
+            notificationsEnabled: _notify,
+          )
+        : OmegaShootModel.completed(
+            id: id,
+            clientName: _completedClientNameCtrl.text,
+            date: _completedSelectedDate,
+            time: _completedSelectedTime,
+            address: _completedAddressCtrl.text,
+            comments: _completedCommentsCtrl.text.isNotEmpty
+                ? _completedCommentsCtrl.text
+                : null,
+            shootReferencesPaths: _refPhotos.map((x) => x.path).toList(),
+            finalShotsPaths: _finalShots.map((x) => x.path).toList(),
+          );
+
+    final cubit = context.read<ShootsCubit>();
+    if (widget.editShoot == null) {
+      cubit.addShoot(model);
+    } else {
+      cubit.updateShoot(model.id, model);
+    }
     Navigator.pop(context);
   }
 
-  void _addCompletedShoot() {
-    final newShoot = OmegaShootModel.completed(
-      id: _uuid.v4(), // Generate a unique ID
-      clientName: _completedClientNameCtrl.text,
-      date: _completedSelectedDate,
-      time: _completedSelectedTime,
-      address: _completedAddressCtrl.text,
-      finalShotsPaths: _finalShots.map((xfile) => xfile.path).toList(),
-      comments: _completedCommentsCtrl.text.isNotEmpty
-          ? _completedCommentsCtrl.text
-          : null,
-      shootReferencesPaths: _refPhotos.map((xfile) => xfile.path).toList(),
+  // deletion
+  Future<void> _deleteShoot() async {
+    final confirmed = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (_) => CupertinoAlertDialog(
+        title: Text(
+          'Delete shoot',
+          style: TextStyle(
+              fontWeight: FontWeight.w600, fontSize: 17.sp, fontFamily: 'Lato'),
+        ),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 8.0),
+          child: Text(
+              'If you delete this shoot, you will not be able to recover it.',
+              style: TextStyle(fontSize: 12.sp, fontFamily: 'Lato')),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            child: Text('Cancel', style: TextStyle(color: Colors.blue)),
+            onPressed: () => Navigator.of(context).pop(false),
+          ),
+          CupertinoDialogAction(
+            child: Text('Delete',
+                style:
+                    TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+            onPressed: () => Navigator.of(context).pop(true),
+          ),
+        ],
+      ),
     );
-    context.read<ShootsCubit>().addShoot(newShoot);
-    Navigator.pop(context);
+    if (confirmed == true) {
+      context.read<ShootsCubit>().deleteShoot(widget.editShoot!.id);
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    }
   }
 
   @override
@@ -187,47 +298,61 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
             ),
     );
 
-    return Scaffold(
-      backgroundColor: AppColors.bgColor,
-      appBar: AppBar(
-        backgroundColor: AppColors.bottomNavigatorAppBarColor,
-        leading: const BackButton(color: Colors.white),
-        title: Text(
-          'Add Shoot',
-          style: TextStyle(
-            color: AppColors.textWhite,
-            fontSize: 20.sp,
-            fontFamily: 'SF PRO',
-            fontWeight: FontWeight.w500,
+    return WillPopScope(
+      onWillPop: _onWillPop,
+      child: Scaffold(
+        backgroundColor: AppColors.bgColor,
+        appBar: AppBar(
+          backgroundColor: AppColors.bottomNavigatorAppBarColor,
+          leading: const BackButton(color: Colors.white),
+          title: Text(
+            widget.editShoot == null ? 'Add Shoot' : 'Edit Shoot',
+            style: TextStyle(
+              color: AppColors.textWhite,
+              fontSize: 20.sp,
+              fontWeight: FontWeight.w500,
+            ),
           ),
+          centerTitle: true,
+          actions: [
+            if (widget.editShoot != null)
+              GestureDetector(
+                onTap: _deleteShoot,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16.w),
+                  child: Icon(Icons.delete, color: Colors.white, size: 24.sp),
+                ),
+              ),
+          ],
         ),
-        centerTitle: true,
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-            child: TabBar(
-              controller: _tc,
-              indicator: indicatorDecoration,
-              indicatorSize: TabBarIndicatorSize.tab,
-              labelColor: AppColors.textWhite,
-              unselectedLabelColor: AppColors.textgrey,
-              labelStyle:
-                  TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w500),
-              tabs: const [Tab(text: 'Planned'), Tab(text: 'Completed')],
+        body: Column(
+          children: [
+            // the tab bar itself + forms - no changes, just switch by _tc
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+              child: TabBar(
+                controller: _tc,
+                indicator: indicatorDecoration,
+                indicatorSize: TabBarIndicatorSize.tab,
+                labelColor: AppColors.textWhite,
+                unselectedLabelColor: AppColors.textgrey,
+                labelStyle:
+                    TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w500),
+                tabs: const [Tab(text: 'Planned'), Tab(text: 'Completed')],
+              ),
             ),
-          ),
-          Expanded(
-            child: TabBarView(
-              controller: _tc,
-              children: [
-                _buildPlannedForm(),
-                _buildCompletedForm(),
-              ],
+            Expanded(
+              child: TabBarView(
+                controller: _tc,
+                children: [
+                  _buildPlannedForm(),
+                  _buildCompletedForm(),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
+        floatingActionButton: null,
       ),
     );
   }
@@ -353,8 +478,12 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
           height: 52.h,
           child: ElevatedButton(
             style: style,
-            onPressed: plannedEnabled ? _addPlannedShoot : null,
-            child: Text('Add',
+            onPressed:
+                plannedEnabled ? _saveShoot : null, // Используем _saveShoot
+            child: Text(
+                widget.editShoot == null
+                    ? 'Add'
+                    : 'Save', // Изменили текст кнопки
                 style: TextStyle(
                   color: AppColors.textWhite,
                   fontSize: 16.sp,
@@ -455,8 +584,12 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
           height: 52.h,
           child: ElevatedButton(
             style: style,
-            onPressed: completedEnabled ? _addCompletedShoot : null,
-            child: Text('Add',
+            onPressed:
+                completedEnabled ? _saveShoot : null, // Используем _saveShoot
+            child: Text(
+                widget.editShoot == null
+                    ? 'Add'
+                    : 'Save', // Изменили текст кнопки
                 style: TextStyle(
                   color: AppColors.textWhite,
                   fontSize: 16.sp,
@@ -478,79 +611,69 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          '$title: Limit ${list.length}/$_maxPhotos',
-          style: TextStyle(color: AppColors.textgrey, fontSize: 12.sp),
-        ),
+        AppTexts(texTs: title),
         SizedBox(height: 8.h),
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
+          itemCount: total,
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 3,
-            mainAxisSpacing: 12.h,
-            crossAxisSpacing: 12.w,
+            crossAxisSpacing: 8.w,
+            mainAxisSpacing: 8.h,
             childAspectRatio: 1,
           ),
-          itemCount: total,
-          itemBuilder: (_, idx) {
-            if (idx == 0 && list.length < _maxPhotos) {
-              return InkWell(
-                onTap: onAdd,
-                borderRadius: BorderRadius.circular(16.r),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.bottomNavigatorAppBarColor,
-                    borderRadius: BorderRadius.circular(16.r),
-                  ),
-                  child: Center(
-                    child: Icon(Icons.add, size: 32.r, color: Colors.white),
-                  ),
-                ),
-              );
-            }
-            // Adjust photoIdx because the first item is the add button
-            final photoIdx = list.length < _maxPhotos ? idx - 1 : idx;
-            if (photoIdx < 0 || photoIdx >= list.length) {
-              return const SizedBox
-                  .shrink(); // Should not happen with correct logic
-            }
-            return Stack(
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16.r),
-                    image: DecorationImage(
-                      image: FileImage(File(list[photoIdx].path)),
+          itemBuilder: (context, i) {
+            if (i < list.length) {
+              return Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8.r),
+                    child: Image.file(
+                      File(list[i].path),
                       fit: BoxFit.cover,
+                      width: double.infinity,
+                      height: double.infinity,
                     ),
                   ),
-                ),
-                Positioned(
-                  top: 4.h,
-                  right: 4.w,
-                  child: InkWell(
-                    onTap: () => onRemove(photoIdx),
-                    borderRadius: BorderRadius.circular(8.r),
-                    child: Container(
-                      width: 36.w,
-                      height: 36.h,
-                      decoration: BoxDecoration(
-                        color: AppColors.bottomNavigatorAppBarColor,
-                        borderRadius: BorderRadius.circular(8.r),
-                      ),
-                      child: Center(
-                        child: Image.asset(
-                          AppIcons.deleteshoot,
-                          width: 18.w,
-                          height: 22.h,
+                  Positioned(
+                    top: 4.h,
+                    right: 4.w,
+                    child: GestureDetector(
+                      onTap: () => onRemove(i),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black54,
+                          borderRadius: BorderRadius.circular(10.r),
+                        ),
+                        child: Icon(
+                          Icons.close,
+                          color: Colors.white,
+                          size: 16.sp,
                         ),
                       ),
                     ),
                   ),
+                ],
+              );
+            } else {
+              return GestureDetector(
+                onTap: onAdd,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.bottomNavigatorAppBarColor,
+                    borderRadius: BorderRadius.circular(8.r),
+                  ),
+                  child: Center(
+                    child: Icon(
+                      Icons.add_a_photo_outlined,
+                      color: AppColors.textgrey,
+                      size: 32.sp,
+                    ),
+                  ),
                 ),
-              ],
-            );
+              );
+            }
           },
         ),
       ],
