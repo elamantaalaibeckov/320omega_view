@@ -10,7 +10,7 @@ import 'package:omega_view_smart_plan_320/model/omega_shoot_model.dart';
 import 'package:omega_view_smart_plan_320/presentetion/themes/app_colors.dart';
 
 class OmegaViewAnalyticsPage extends StatefulWidget {
-  const OmegaViewAnalyticsPage({Key? key}) : super(key: key);
+  const OmegaViewAnalyticsPage({super.key});
 
   @override
   State<OmegaViewAnalyticsPage> createState() => _OmegaViewAnalyticsPageState();
@@ -91,6 +91,7 @@ class _OmegaViewAnalyticsPageState extends State<OmegaViewAnalyticsPage>
     final net = incomeSum - expenseSum;
     final netColor = net >= 0 ? accent : Colors.redAccent;
 
+    final periods = ['1 week', '1 month', '3 months', '6 months'];
     return Scaffold(
       backgroundColor: AppColors.bgColor,
       appBar: AppBar(
@@ -111,34 +112,53 @@ class _OmegaViewAnalyticsPageState extends State<OmegaViewAnalyticsPage>
         child: Column(
           children: [
             // TabBar
-            Center(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: AppColors.bgColor,
-                  borderRadius: BorderRadius.circular(16.r),
+
+            Container(
+              decoration: BoxDecoration(
+                color: AppColors.bgColor,
+                borderRadius: BorderRadius.circular(16.r),
+              ),
+              child: TabBar(
+                controller: _tabController,
+                dividerColor: AppColors.bgColor,
+                isScrollable: true,
+                padding: EdgeInsets.zero, // общий отступ вокруг всей полосы
+                labelPadding:
+                    EdgeInsets.zero, // убираем дефолтный отступ между табами
+                indicatorPadding: EdgeInsets.zero,
+                tabAlignment: TabAlignment.start,
+                indicator: BoxDecoration(
+                  border: Border.all(color: accent, width: 1.5),
+                  borderRadius: indicatorRadius,
                 ),
-                child: TabBar(
-                  controller: _tabController,
-                  dividerColor: AppColors.bgColor,
-                  isScrollable: false,
-                  indicator: BoxDecoration(
-                    border: Border.all(color: accent, width: 1.5),
-                    borderRadius: indicatorRadius,
-                  ),
-                  indicatorSize: TabBarIndicatorSize.tab,
-                  labelColor: AppColors.textWhite,
-                  unselectedLabelColor: AppColors.textgrey,
-                  labelStyle:
-                      TextStyle(fontSize: 17.sp, fontWeight: FontWeight.w500),
-                  tabs: const [
-                    Tab(text: '1 week'),
-                    Tab(text: '1 month'),
-                    Tab(text: '3 months'),
-                    Tab(text: '6 months'),
-                  ],
-                ),
+                indicatorSize: TabBarIndicatorSize.tab,
+                labelColor: AppColors.textWhite,
+                unselectedLabelColor: AppColors.textgrey,
+                labelStyle:
+                    TextStyle(fontSize: 17.sp, fontWeight: FontWeight.w500),
+                tabs: periods
+                    .map((t) => Tab(
+                          child: Container(
+                            height: 54.h, // высота таба
+                            width:
+                                120.w, // ширина таба (если нужно фиксированно)
+                            alignment: Alignment.center,
+                            padding: EdgeInsets.symmetric(
+                              // внутренний отступ текста
+                              horizontal: 16.w,
+                              vertical: 8.h,
+                            ),
+                            child: Text(
+                              t,
+                              style: TextStyle(
+                                  fontSize: 17.sp, fontWeight: FontWeight.w500),
+                            ),
+                          ),
+                        ))
+                    .toList(),
               ),
             ),
+
             SizedBox(height: 24.h),
 
             // Donut chart

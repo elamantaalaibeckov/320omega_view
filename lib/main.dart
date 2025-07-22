@@ -62,7 +62,7 @@ Future<void> main() async {
 }
 
 class OmegaApp extends StatelessWidget {
-  const OmegaApp({Key? key}) : super(key: key);
+  const OmegaApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -71,10 +71,10 @@ class OmegaApp extends StatelessWidget {
       title: 'Omega App',
       theme: ThemeData(
         scaffoldBackgroundColor: AppColors.bgColor,
-        bottomAppBarTheme: BottomAppBarTheme(
+        bottomAppBarTheme: const BottomAppBarTheme(
           color: AppColors.bottomNavigatorAppBarColor,
         ),
-        bottomNavigationBarTheme: BottomNavigationBarThemeData(
+        bottomNavigationBarTheme: const BottomNavigationBarThemeData(
           backgroundColor: AppColors.bottomNavigatorAppBarColor,
           selectedItemColor: AppColors.mainAccent,
           unselectedItemColor: AppColors.textWhite,

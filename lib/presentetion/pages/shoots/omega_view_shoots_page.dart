@@ -7,6 +7,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:omega_view_smart_plan_320/cubit/shoots/shoots_cubit.dart';
 import 'package:omega_view_smart_plan_320/cubit/shoots/shoots_state.dart';
 import 'package:omega_view_smart_plan_320/model/omega_shoot_model.dart';
+import 'package:omega_view_smart_plan_320/presentetion/pages/shoots/screens/omega_shoot_details_page.dart';
 import 'package:omega_view_smart_plan_320/presentetion/pages/shoots/screens/planned_add_shoot.dart';
 import 'package:omega_view_smart_plan_320/presentetion/themes/app_colors.dart';
 import 'package:omega_view_smart_plan_320/presentetion/themes/app_icons.dart';
@@ -14,7 +15,7 @@ import 'package:omega_view_smart_plan_320/presentetion/themes/app_images.dart';
 import 'package:intl/intl.dart'; // Import for date formatting
 
 class OmegaViewShootsPage extends StatefulWidget {
-  const OmegaViewShootsPage({Key? key}) : super(key: key);
+  const OmegaViewShootsPage({super.key});
 
   @override
   State<OmegaViewShootsPage> createState() => _OmegaViewShootsPageState();
@@ -196,7 +197,7 @@ class _OmegaViewShootsPageState extends State<OmegaViewShootsPage>
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => PlannedAddShoot(editShoot: shoot),
+            builder: (_) => ShootDetailsPage(shoot: shoot),
           ),
         );
       },
