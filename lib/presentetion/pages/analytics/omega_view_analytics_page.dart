@@ -141,7 +141,6 @@ class _OmegaViewAnalyticsPageState extends State<OmegaViewAnalyticsPage>
             ),
             SizedBox(height: 24.h),
 
-            // Donut chart
             SizedBox(
               width: 220.w,
               height: 220.h,
