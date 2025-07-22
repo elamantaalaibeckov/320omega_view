@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:omega_view_smart_plan_320/presentetion/pages/omega_splash_screen.dart';
 import 'package:path_provider/path_provider.dart';
-
-import 'package:omega_view_smart_plan_320/presentetion/pages/omega_bottomnavigation_bar.dart';
 import 'package:omega_view_smart_plan_320/presentetion/themes/app_colors.dart';
 
 // Сервисы Hive
@@ -26,6 +25,7 @@ Future<void> main() async {
   final appDocumentDir = await getApplicationDocumentsDirectory();
   // Инициализируем Hive с этим путём
   await Hive.initFlutter(appDocumentDir.path);
+  await Hive.openBox('settings');
 
   // Регистрируем адаптеры (типId 0 — для съёмок, 1 — для транзакций)
   if (!Hive.isAdapterRegistered(0)) {
@@ -62,7 +62,7 @@ Future<void> main() async {
 }
 
 class OmegaApp extends StatelessWidget {
-  const OmegaApp({Key? key}) : super(key: key);
+  const OmegaApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -83,7 +83,7 @@ class OmegaApp extends StatelessWidget {
           type: BottomNavigationBarType.fixed,
         ),
       ),
-      home: const OmegaBottomnavigationBar(),
+      home: const OmegaSplashScreen(),
     );
   }
 }
