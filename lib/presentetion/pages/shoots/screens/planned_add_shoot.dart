@@ -7,6 +7,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:omega_view_smart_plan_320/presentetion/themes/app_icons.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:uuid/uuid.dart';
 
@@ -14,7 +15,6 @@ import 'package:omega_view_smart_plan_320/cubit/shoots/shoots_cubit.dart';
 import 'package:omega_view_smart_plan_320/model/omega_shoot_model.dart';
 import 'package:omega_view_smart_plan_320/presentetion/pages/shoots/screens/cupertino_date_picker.dart';
 import 'package:omega_view_smart_plan_320/presentetion/themes/app_colors.dart';
-import 'package:omega_view_smart_plan_320/presentetion/themes/app_icons.dart';
 import 'package:omega_view_smart_plan_320/presentetion/widgets/app_text.dart';
 import 'package:omega_view_smart_plan_320/presentetion/widgets/app_text_filed.dart';
 
@@ -319,9 +319,13 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
               GestureDetector(
                 onTap: _deleteShoot,
                 child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16.w),
-                  child: Icon(Icons.delete, color: Colors.white, size: 24.sp),
-                ),
+                    padding: EdgeInsets.symmetric(horizontal: 16.w),
+                    child: Image.asset(
+                      AppIcons.deleteshoot,
+                      width: 24.w,
+                      height: 24.h,
+                      color: AppColors.textWhite,
+                    )),
               ),
           ],
         ),
@@ -607,7 +611,11 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
     required VoidCallback onAdd,
     required void Function(int) onRemove,
   }) {
-    final total = list.length < _maxPhotos ? list.length + 1 : _maxPhotos;
+    // флаг, что есть место для добавления
+    final hasAdd = list.length < _maxPhotos;
+    // если можем добавить – вместимость = текущие + 1, иначе = текущие
+    final total = hasAdd ? list.length + 1 : list.length;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -624,39 +632,8 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
             childAspectRatio: 1,
           ),
           itemBuilder: (context, i) {
-            if (i < list.length) {
-              return Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8.r),
-                    child: Image.file(
-                      File(list[i].path),
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                      height: double.infinity,
-                    ),
-                  ),
-                  Positioned(
-                    top: 4.h,
-                    right: 4.w,
-                    child: GestureDetector(
-                      onTap: () => onRemove(i),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.black54,
-                          borderRadius: BorderRadius.circular(10.r),
-                        ),
-                        child: Icon(
-                          Icons.close,
-                          color: Colors.white,
-                          size: 16.sp,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            } else {
+            // первая ячейка — Add
+            if (hasAdd && i == 0) {
               return GestureDetector(
                 onTap: onAdd,
                 child: Container(
@@ -665,15 +642,57 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
                     borderRadius: BorderRadius.circular(8.r),
                   ),
                   child: Center(
-                    child: Icon(
-                      Icons.add_a_photo_outlined,
-                      color: AppColors.textgrey,
-                      size: 32.sp,
+                    child: Image.asset(
+                      AppIcons.plusIcon,
+                      width: 32.w,
+                      height: 32.h,
                     ),
                   ),
                 ),
               );
             }
+
+            // для фотографий вычисляем реальный индекс:
+            final photoIdx = hasAdd ? i - 1 : i;
+            if (photoIdx < list.length) {
+              return Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8.r),
+                    child: Image.file(
+                      File(list[photoIdx].path),
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      height: double.infinity,
+                    ),
+                  ),
+                  Positioned(
+                    top: 0,
+                    right: 0,
+                    child: InkWell(
+                      onTap: () => onRemove(photoIdx),
+                      borderRadius: BorderRadius.circular(8.r),
+                      child: Container(
+                        width: 36.w,
+                        height: 36.h,
+                        decoration: BoxDecoration(
+                          color: AppColors.bottomNavigatorAppBarColor,
+                          borderRadius: BorderRadius.circular(8.r),
+                        ),
+                        child: Center(
+                          child: Image.asset(
+                            AppIcons.deleteshoot,
+                            width: 18.w,
+                            height: 22.h,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            }
+            return const SizedBox.shrink();
           },
         ),
       ],

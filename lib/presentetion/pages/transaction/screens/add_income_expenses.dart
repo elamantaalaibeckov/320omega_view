@@ -10,6 +10,7 @@ import 'package:omega_view_smart_plan_320/cubit/transactions/transactions_cubit.
 import 'package:omega_view_smart_plan_320/model/omega_shoot_model.dart';
 import 'package:omega_view_smart_plan_320/model/omega_transaction_model.dart';
 import 'package:omega_view_smart_plan_320/presentetion/themes/app_colors.dart';
+import 'package:omega_view_smart_plan_320/presentetion/themes/app_icons.dart';
 import 'package:omega_view_smart_plan_320/presentetion/widgets/app_text.dart';
 import 'package:omega_view_smart_plan_320/presentetion/widgets/app_text_filed.dart';
 import 'package:uuid/uuid.dart';
@@ -327,8 +328,13 @@ class _AddTransactionPageState extends State<AddTransactionPage>
           actions: [
             if (_isEditing)
               IconButton(
-                icon: Icon(Icons.delete_outline, color: Colors.white),
-                onPressed: _confirmDelete,
+                padding: EdgeInsets.symmetric(horizontal: 16.w),
+                icon: Image.asset(
+                  AppIcons.deleteshoot,
+                  width: 24.w,
+                  height: 24.h,
+                ),
+                onPressed: () => _confirmDelete(),
               ),
           ],
         ),

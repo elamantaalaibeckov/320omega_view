@@ -191,8 +191,7 @@ class _OmegaViewShootsPageState extends State<OmegaViewShootsPage>
   }
 
   Widget _buildShootCard(OmegaShootModel shoot, bool isPlannedTab) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(16.r),
+    return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
