@@ -35,7 +35,6 @@ class ExpenseItem {
 
 /// Страница добавления/редактирования транзакции
 class AddTransactionPage extends StatefulWidget {
-  /// Если передаём existing, то работаем в режиме редактирования
   final OmegaTransactionModel? initialTx;
   final OmegaShootModel? initialShoot;
 
@@ -52,7 +51,7 @@ class AddTransactionPage extends StatefulWidget {
 class _AddTransactionPageState extends State<AddTransactionPage>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
-  bool _isDirty = false; // флаг изменений
+  bool _isDirty = false;
   int _tabIndex = 0;
 
   OmegaShootModel? _selectedShoot;
@@ -65,18 +64,14 @@ class _AddTransactionPageState extends State<AddTransactionPage>
 
   bool get _isEditing => widget.initialTx != null;
 
-  // Новое свойство для определения, можно ли сохранить транзакцию
   bool get _canSaveTransaction {
     if (_selectedShoot == null) return false;
 
     if (_tabIndex == 0) {
-      // Income tab
       return (_incomeAmountController.text.isNotEmpty &&
           (double.tryParse(_incomeAmountController.text) ?? 0) > 0);
     } else {
-      // Expenses tab
       if (_expenseItems.isEmpty) return false;
-      // Проверяем, что хотя бы один элемент расхода заполнен полностью
       return _expenseItems.any((item) =>
           item.nameController.text.trim().isNotEmpty &&
           (double.tryParse(item.priceController.text) ?? 0) > 0);
@@ -86,7 +81,8 @@ class _AddTransactionPageState extends State<AddTransactionPage>
   @override
   void initState() {
     super.initState();
-    // Если редактируем, префилл контроллеров
+
+    // ----------- PREFILL -----------
     if (_isEditing) {
       final tx = widget.initialTx!;
       _selectedShoot = widget.initialShoot;
@@ -100,36 +96,36 @@ class _AddTransactionPageState extends State<AddTransactionPage>
           ExpenseItem(
             id: _uuid.v4(),
             nameController: TextEditingController(text: tx.note)
-              ..addListener(_updateSaveButton), // Добавляем слушатель
+              ..addListener(_updateSaveButton),
             priceController:
                 TextEditingController(text: tx.amount.toStringAsFixed(0))
-                  ..addListener(_updateSaveButton), // Добавляем слушатель
+                  ..addListener(_updateSaveButton),
           ),
         );
       }
     } else {
-      // при добавлении в расходах создаём пустой item
       _expenseItems.add(
         ExpenseItem(
           id: _uuid.v4(),
           nameController: TextEditingController()
-            ..addListener(_updateSaveButton), // Добавляем слушатель
+            ..addListener(_updateSaveButton),
           priceController: TextEditingController()
-            ..addListener(_updateSaveButton), // Добавляем слушатель
+            ..addListener(_updateSaveButton),
         ),
       );
     }
 
-    // слушатели для dirty‑флага
     _incomeAmountController.addListener(_markDirty);
     _commentsController.addListener(_markDirty);
-    _incomeAmountController
-        .addListener(_updateSaveButton); // Добавляем слушатель для Income
-    _commentsController
-        .addListener(_updateSaveButton); // Добавляем слушатель для Comments
+    _incomeAmountController.addListener(_updateSaveButton);
+    _commentsController.addListener(_updateSaveButton);
 
-    _tabController = TabController(length: 2, vsync: this)
-      ..addListener(_handleTabSelection);
+    // ----------- FIX: initialIndex -----------
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: _tabIndex, // стартуем с нужной вкладки (Income/Expenses)
+    )..addListener(_handleTabSelection);
 
     context.read<ShootsCubit>().loadShoots();
   }
@@ -138,26 +134,29 @@ class _AddTransactionPageState extends State<AddTransactionPage>
     if (!_isDirty) setState(() => _isDirty = true);
   }
 
-  // Новый метод для обновления состояния кнопки "Add/Save"
-  void _updateSaveButton() {
-    setState(() {
-      // Это пустой setState, но он заставит виджет перестроиться
-      // и пересчитать значение _canSaveTransaction
-    });
-  }
+  void _updateSaveButton() => setState(() {});
 
   void _handleTabSelection() {
+    // если индекс реально не поменялся — выходим
+    if (_tabController.index == _tabIndex) return;
+
     setState(() {
       _tabIndex = _tabController.index;
-      _selectedShoot = null;
-      _isShootPickerOpen = false;
-      _incomeAmountController.clear();
-      _commentsController.clear();
-      _disposeExpenseItems();
-      _expenseItems.clear();
-      if (_tabIndex == 1) _addExpenseItem();
-      _isDirty = true;
-      _updateSaveButton(); // Обновляем состояние кнопки при смене вкладки
+      _isShootPickerOpen = false; // просто закрыли список
+      // НИЧЕГО НЕ ЧИСТИМ
+
+      // Если впервые зашли в Expenses и список пуст — создаём один элемент
+      if (_tabIndex == 1 && _expenseItems.isEmpty) {
+        _expenseItems.add(
+          ExpenseItem(
+            id: _uuid.v4(),
+            nameController: TextEditingController()
+              ..addListener(_updateSaveButton),
+            priceController: TextEditingController()
+              ..addListener(_updateSaveButton),
+          ),
+        );
+      }
     });
   }
 
@@ -165,10 +164,9 @@ class _AddTransactionPageState extends State<AddTransactionPage>
   void dispose() {
     _tabController.removeListener(_handleTabSelection);
     _tabController.dispose();
-    _incomeAmountController
-        .removeListener(_updateSaveButton); // Удаляем слушатель
+    _incomeAmountController.removeListener(_updateSaveButton);
     _incomeAmountController.dispose();
-    _commentsController.removeListener(_updateSaveButton); // Удаляем слушатель
+    _commentsController.removeListener(_updateSaveButton);
     _commentsController.dispose();
     _disposeExpenseItems();
     super.dispose();
@@ -179,7 +177,6 @@ class _AddTransactionPageState extends State<AddTransactionPage>
   }
 
   void _addExpenseItem() {
-    // валидируем предыдущий
     if (_expenseItems.isNotEmpty) {
       final last = _expenseItems.last;
       if (last.nameController.text.trim().isEmpty ||
@@ -204,7 +201,7 @@ class _AddTransactionPageState extends State<AddTransactionPage>
         ),
       );
       _isDirty = true;
-      _updateSaveButton(); // Обновляем состояние кнопки
+      _updateSaveButton();
     });
   }
 
@@ -212,17 +209,13 @@ class _AddTransactionPageState extends State<AddTransactionPage>
     setState(() {
       final idx = _expenseItems.indexWhere((e) => e.id == id);
       if (idx != -1) {
-        _expenseItems[idx]
-            .nameController
-            .removeListener(_updateSaveButton); // Удаляем слушатель
-        _expenseItems[idx]
-            .priceController
-            .removeListener(_updateSaveButton); // Удаляем слушатель
+        _expenseItems[idx].nameController.removeListener(_updateSaveButton);
+        _expenseItems[idx].priceController.removeListener(_updateSaveButton);
         _expenseItems[idx].dispose();
         _expenseItems.removeAt(idx);
         if (_expenseItems.isEmpty) _addExpenseItem();
         _isDirty = true;
-        _updateSaveButton(); // Обновляем состояние кнопки
+        _updateSaveButton();
       }
     });
   }
@@ -242,13 +235,11 @@ class _AddTransactionPageState extends State<AddTransactionPage>
 
     final cubit = context.read<TransactionsCubit>();
 
-    // Если мы в режиме редактирования — удаляем старую запись
     if (_isEditing) {
       await cubit.deleteTransaction(widget.initialTx!.id);
     }
 
     if (_tabIndex == 0) {
-      // Income
       final amount = double.tryParse(_incomeAmountController.text) ?? 0;
       final tx = OmegaTransactionModel(
         id: _uuid.v4(),
@@ -261,11 +252,10 @@ class _AddTransactionPageState extends State<AddTransactionPage>
       );
       await cubit.addTransaction(tx);
     } else {
-      // Expenses: по одной транзакции на каждую статью расхода
       for (var item in _expenseItems) {
         final name = item.nameController.text.trim();
         final price = double.tryParse(item.priceController.text) ?? 0;
-        if (name.isEmpty || price <= 0) continue; // Пропускаем незаполненные
+        if (name.isEmpty || price <= 0) continue;
         final tx = OmegaTransactionModel(
           id: _uuid.v4(),
           shootId: _selectedShoot!.id,
@@ -430,8 +420,8 @@ class _AddTransactionPageState extends State<AddTransactionPage>
                     backgroundColor:
                         WidgetStateProperty.resolveWith<Color>((states) {
                       return states.contains(WidgetState.disabled)
-                          ? AppColors.grey2 // серый, когда нельзя
-                          : AppColors.mainAccent; // синий, когда можно
+                          ? AppColors.grey2
+                          : AppColors.mainAccent;
                     }),
                     foregroundColor: WidgetStateProperty.all(Colors.white),
                     shape: WidgetStateProperty.all(
@@ -494,7 +484,7 @@ class _AddTransactionPageState extends State<AddTransactionPage>
           hintText: 'Add Income',
           controller: _incomeAmountController,
           isNumberOnly: true,
-          onChanged: (_) => _updateSaveButton(), // Добавляем слушатель
+          onChanged: (_) => _updateSaveButton(),
         ),
         SizedBox(height: 16.h),
         AppTexts(texTs: 'Select Shoot'),
@@ -507,7 +497,7 @@ class _AddTransactionPageState extends State<AddTransactionPage>
         AppTextField(
           hintText: 'Add Comments',
           controller: _commentsController,
-          onChanged: (_) => _updateSaveButton(), // Добавляем слушатель
+          onChanged: (_) => _updateSaveButton(),
         ),
         SizedBox(height: 24.h),
       ],
@@ -522,8 +512,6 @@ class _AddTransactionPageState extends State<AddTransactionPage>
         AppTexts(texTs: 'Select Shoot'),
         SizedBox(height: 8.h),
         _buildShootPickerButton(),
-
-        // список съёмок с BouncingScrollPhysics
         if (_isShootPickerOpen)
           Padding(
             padding: EdgeInsets.only(top: 16.h),
@@ -542,8 +530,13 @@ class _AddTransactionPageState extends State<AddTransactionPage>
                 itemBuilder: (context, i) {
                   final shoot = shoots[i];
                   final isSel = _selectedShoot?.id == shoot.id;
-                  final dt = DateTime(shoot.date.year, shoot.date.month,
-                      shoot.date.day, shoot.time.hour, shoot.time.minute);
+                  final dt = DateTime(
+                    shoot.date.year,
+                    shoot.date.month,
+                    shoot.date.day,
+                    shoot.time.hour,
+                    shoot.time.minute,
+                  );
                   File? preview;
                   final photos = shoot.finalShotsPaths ?? [];
                   if (photos.isNotEmpty) {
@@ -554,7 +547,7 @@ class _AddTransactionPageState extends State<AddTransactionPage>
                     onTap: () => setState(() {
                       _selectedShoot = shoot;
                       _isShootPickerOpen = false;
-                      _updateSaveButton(); // Обновляем состояние кнопки при выборе съемки
+                      _updateSaveButton();
                     }),
                     borderRadius: BorderRadius.circular(16.r),
                     child: Container(
@@ -647,12 +640,9 @@ class _AddTransactionPageState extends State<AddTransactionPage>
               ),
             ),
           ),
-
         SizedBox(height: 16.h),
         AppTexts(texTs: 'Expenses'),
         SizedBox(height: 8.h),
-
-        // список полей расходов с BouncingScrollPhysics
         ListView.builder(
           shrinkWrap: true,
           physics: const BouncingScrollPhysics(),
@@ -674,8 +664,7 @@ class _AddTransactionPageState extends State<AddTransactionPage>
                       hintText: 'Add name',
                       controller: e.nameController,
                       fillColor: AppColors.cardGrey,
-                      onChanged: (_) =>
-                          _updateSaveButton(), // Добавляем слушатель
+                      onChanged: (_) => _updateSaveButton(),
                     ),
                     SizedBox(height: 12.h),
                     AppTextField(
@@ -683,8 +672,7 @@ class _AddTransactionPageState extends State<AddTransactionPage>
                       controller: e.priceController,
                       fillColor: AppColors.cardGrey,
                       isNumberOnly: true,
-                      onChanged: (_) =>
-                          _updateSaveButton(), // Добавляем слушатель
+                      onChanged: (_) => _updateSaveButton(),
                     ),
                     if (idx > 0)
                       Padding(
@@ -718,7 +706,6 @@ class _AddTransactionPageState extends State<AddTransactionPage>
             );
           },
         ),
-
         SizedBox(height: 16.h),
         SizedBox(
           width: double.infinity,
@@ -730,14 +717,15 @@ class _AddTransactionPageState extends State<AddTransactionPage>
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16.r)),
             ),
-            child: Text('Add Expense',
-                style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16.sp,
-                    fontWeight: FontWeight.w600)),
+            child: Text(
+              'Add Expense',
+              style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16.sp,
+                  fontWeight: FontWeight.w600),
+            ),
           ),
         ),
-
         SizedBox(height: 16.h),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -754,14 +742,13 @@ class _AddTransactionPageState extends State<AddTransactionPage>
                     fontWeight: FontWeight.w600)),
           ],
         ),
-
         SizedBox(height: 16.h),
         AppTexts(texTs: 'Comments (optional)'),
         SizedBox(height: 8.h),
         AppTextField(
           hintText: 'Add Comments',
           controller: _commentsController,
-          onChanged: (_) => _updateSaveButton(), // Добавляем слушатель
+          onChanged: (_) => _updateSaveButton(),
         ),
         SizedBox(height: 24.h),
       ],
@@ -772,7 +759,7 @@ class _AddTransactionPageState extends State<AddTransactionPage>
     return GestureDetector(
       onTap: () => setState(() {
         _isShootPickerOpen = !_isShootPickerOpen;
-        _updateSaveButton(); // Обновляем состояние кнопки при открытии/закрытии пикера
+        _updateSaveButton();
       }),
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 14.h),
@@ -858,7 +845,7 @@ class _AddTransactionPageState extends State<AddTransactionPage>
               onTap: () => setState(() {
                 _selectedShoot = shoot;
                 _isShootPickerOpen = false;
-                _updateSaveButton(); // Обновляем состояние кнопки при выборе съемки
+                _updateSaveButton();
               }),
               borderRadius: BorderRadius.circular(16.r),
               child: Container(

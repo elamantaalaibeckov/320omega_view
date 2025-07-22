@@ -1,5 +1,4 @@
 // lib/presentation/pages/shoots/screens/planned_add_shoot.dart
-
 import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -19,7 +18,6 @@ import 'package:omega_view_smart_plan_320/presentetion/widgets/app_text.dart';
 import 'package:omega_view_smart_plan_320/presentetion/widgets/app_text_filed.dart';
 
 class PlannedAddShoot extends StatefulWidget {
-  /// If not null, we are in edit mode
   final OmegaShootModel? editShoot;
   const PlannedAddShoot({Key? key, this.editShoot}) : super(key: key);
 
@@ -29,11 +27,10 @@ class PlannedAddShoot extends StatefulWidget {
 
 class _PlannedAddShootState extends State<PlannedAddShoot>
     with SingleTickerProviderStateMixin {
-  // for dirty mode
   bool _isDirty = false;
 
-  // tab controller
   late final TabController _tc;
+  int _tabIndex = 0; // <-- текущее состояние вкладки
 
   // Planned fields
   DateTime _plannedSelectedDate = DateTime.now();
@@ -56,67 +53,110 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
   final _completedAddressCtrl = TextEditingController();
   final _completedCommentsCtrl = TextEditingController();
 
-  // photos
+  // photos (общие списки, как у тебя)
   final List<XFile> _refPhotos = [];
   final List<XFile> _finalShots = [];
   static const int _maxPhotos = 17;
   final ImagePicker _picker = ImagePicker();
   final Uuid _uuid = const Uuid();
 
+  // ---------- ADDED helpers ----------
+  void _clearPlanned() {
+    _plannedSelectedDate = DateTime.now();
+    _plannedSelectedTime =
+        DateTime(0, 0, 0, TimeOfDay.now().hour, TimeOfDay.now().minute);
+    _plannedDatePicked = false;
+    _plannedTimePicked = false;
+    _plannedClientNameCtrl.clear();
+    _plannedAddressCtrl.clear();
+    _plannedCommentsCtrl.clear();
+    _notify = false;
+  }
+
+  void _clearCompleted() {
+    _completedSelectedDate = DateTime.now();
+    _completedSelectedTime =
+        DateTime(0, 0, 0, TimeOfDay.now().hour, TimeOfDay.now().minute);
+    _completedDatePicked = false;
+    _completedTimePicked = false;
+    _completedClientNameCtrl.clear();
+    _completedAddressCtrl.clear();
+    _completedCommentsCtrl.clear();
+    _finalShots.clear();
+  }
+  // ------------------------------------
+
   @override
   void initState() {
     super.initState();
-    _tc = TabController(length: 2, vsync: this)
-      ..addListener(() => setState(() {}));
 
-    // if editShoot is passed - fill fields
+    // Prefill only the side we're editing
     if (widget.editShoot != null) {
       final s = widget.editShoot!;
-      _tc.index = s.isPlanned ? 0 : 1;
+      _tabIndex = s.isPlanned ? 0 : 1;
 
-      // Planned
-      _plannedSelectedDate = s.date;
-      _plannedDatePicked = true;
-      _plannedSelectedTime = s.time;
-      _plannedTimePicked = true;
-      _plannedClientNameCtrl.text = s.clientName;
-      _plannedAddressCtrl.text = s.address;
-      if (s.comments != null) _plannedCommentsCtrl.text = s.comments!;
-      if (s.shootReferencesPaths.isNotEmpty) {
-        _refPhotos.addAll(
-          s.shootReferencesPaths.map((p) => XFile(p)),
-        );
-      }
-      _notify = s.notificationsEnabled ?? false;
+      if (s.isPlanned) {
+        // ---- FILL PLANNED ONLY ----
+        _plannedSelectedDate = s.date;
+        _plannedDatePicked = true;
+        _plannedSelectedTime = s.time;
+        _plannedTimePicked = true;
+        _plannedClientNameCtrl.text = s.clientName;
+        _plannedAddressCtrl.text = s.address;
+        if (s.comments != null) _plannedCommentsCtrl.text = s.comments!;
+        if (s.shootReferencesPaths.isNotEmpty) {
+          _refPhotos.addAll(s.shootReferencesPaths.map((p) => XFile(p)));
+        }
+        _notify = s.notificationsEnabled ?? false;
 
-      // Completed
-      _completedSelectedDate = s.date;
-      _completedDatePicked = true;
-      _completedSelectedTime = s.time;
-      _completedTimePicked = true;
-      _completedClientNameCtrl.text = s.clientName;
-      _completedAddressCtrl.text = s.address;
-      if (s.comments != null) _completedCommentsCtrl.text = s.comments!;
-      if (s.finalShotsPaths != null) {
-        _finalShots.addAll(
-          s.finalShotsPaths!.map((p) => XFile(p)),
-        );
+        // other side empty
+        _clearCompleted();
+      } else {
+        // ---- FILL COMPLETED ONLY ----
+        _completedSelectedDate = s.date;
+        _completedDatePicked = true;
+        _completedSelectedTime = s.time;
+        _completedTimePicked = true;
+        _completedClientNameCtrl.text = s.clientName;
+        _completedAddressCtrl.text = s.address;
+        if (s.comments != null) _completedCommentsCtrl.text = s.comments!;
+        if (s.finalShotsPaths != null) {
+          _finalShots.addAll(s.finalShotsPaths!.map((p) => XFile(p)));
+        }
+        if (s.shootReferencesPaths.isNotEmpty) {
+          _refPhotos.addAll(s.shootReferencesPaths.map((p) => XFile(p)));
+        }
+
+        // other side empty
+        _clearPlanned();
       }
     }
 
-    // listen for changes to mark dirty
+    _tc = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: _tabIndex,
+    )..addListener(_onTabChanged);
+
+    // mark dirty on text fields
     [
       _plannedClientNameCtrl,
       _plannedAddressCtrl,
       _plannedCommentsCtrl,
       _completedClientNameCtrl,
       _completedAddressCtrl,
-      _completedCommentsCtrl
+      _completedCommentsCtrl,
     ].forEach((c) => c.addListener(() => _isDirty = true));
+  }
+
+  void _onTabChanged() {
+    if (_tc.index == _tabIndex) return;
+    setState(() => _tabIndex = _tc.index);
   }
 
   @override
   void dispose() {
+    _tc.removeListener(_onTabChanged);
     _tc.dispose();
     _plannedClientNameCtrl.dispose();
     _plannedAddressCtrl.dispose();
@@ -127,20 +167,17 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
     super.dispose();
   }
 
-  // prompt when exiting without saving
   Future<bool> _onWillPop() async {
     if (!_isDirty) return true;
     final bool? confirmExit = await showCupertinoDialog<bool>(
       context: context,
       builder: (BuildContext ctx) {
         return CupertinoAlertDialog(
-          title: Text(
-            'Leave the page?',
-            style: TextStyle(
-                color: Colors.black,
-                fontSize: 17.sp,
-                fontWeight: FontWeight.w600),
-          ),
+          title: Text('Leave the page?',
+              style: TextStyle(
+                  color: Colors.black,
+                  fontSize: 17.sp,
+                  fontWeight: FontWeight.w600)),
           content: Text(
             'Are you sure you want to get out? These transaction changes will not be saved',
             style: TextStyle(color: Colors.black, fontSize: 13.sp),
@@ -167,7 +204,6 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
     return confirmExit ?? false;
   }
 
-  // photo selection dialog
   Future<void> _pickPhotos(List<XFile> targetList) async {
     _isDirty = true;
     final status = await Permission.photos.request();
@@ -205,11 +241,10 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
     setState(() => list.removeAt(i));
   }
 
-  // save or update
   void _saveShoot() {
-    final isPlanned = _tc.index == 0;
-    final id =
-        widget.editShoot?.id ?? const Uuid().v4(); // Corrected Uuid usage
+    final isPlanned = _tabIndex == 0;
+    final id = widget.editShoot?.id ?? const Uuid().v4();
+
     final model = isPlanned
         ? OmegaShootModel.planned(
             id: id,
@@ -245,7 +280,6 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
     Navigator.pop(context);
   }
 
-  // deletion
   Future<void> _deleteShoot() async {
     final confirmed = await showCupertinoDialog<bool>(
       context: context,
@@ -284,7 +318,8 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
   @override
   Widget build(BuildContext context) {
     final accent = AppColors.mainAccent;
-    final isFirstTab = _tc.index == 0;
+    final isFirstTab = _tabIndex == 0;
+
     final indicatorDecoration = BoxDecoration(
       border: Border.all(color: accent, width: 1.5),
       borderRadius: isFirstTab
@@ -331,7 +366,6 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
         ),
         body: Column(
           children: [
-            // the tab bar itself + forms - no changes, just switch by _tc
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
               child: TabBar(
@@ -356,13 +390,11 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
             ),
           ],
         ),
-        floatingActionButton: null,
       ),
     );
   }
 
   Widget _buildPlannedForm() {
-    // enable when all required fields filled
     final bool plannedEnabled = _plannedDatePicked &&
         _plannedTimePicked &&
         _plannedClientNameCtrl.text.isNotEmpty &&
@@ -506,12 +538,12 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
         _finalShots.isNotEmpty;
 
     final ButtonStyle style = ButtonStyle(
-      backgroundColor: WidgetStateProperty.resolveWith((states) {
-        return states.contains(WidgetState.disabled)
+      backgroundColor: MaterialStateProperty.resolveWith((states) {
+        return states.contains(MaterialState.disabled)
             ? AppColors.textgrey
             : AppColors.mainAccent;
       }),
-      shape: WidgetStateProperty.all(
+      shape: MaterialStateProperty.all(
         RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16.r),
         ),
