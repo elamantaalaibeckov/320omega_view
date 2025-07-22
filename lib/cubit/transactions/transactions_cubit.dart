@@ -20,26 +20,52 @@ class TransactionsCubit extends Cubit<TransactionsState> {
         isLoading: false,
         errorMessage: e.toString(),
       ));
+      print('Error loading transactions: $e'); // Добавим для отладки
     }
   }
 
   Future<void> addTransaction(OmegaTransactionModel tx) async {
-    await _service.addTransaction(tx);
-    await loadTransactions();
+    try {
+      await _service.addTransaction(tx);
+      await loadTransactions();
+    } catch (e) {
+      emit(state.copyWith(errorMessage: 'Failed to add transaction: $e'));
+      print('Error adding transaction: $e');
+    }
   }
 
-  Future<void> updateTransaction(int key, OmegaTransactionModel tx) async {
-    await _service.updateTransaction(key, tx);
-    await loadTransactions();
+  Future<void> updateTransaction(String id, OmegaTransactionModel tx) async { // Используем String id
+    try {
+      await _service.updateTransaction(id, tx);
+      await loadTransactions();
+    } catch (e) {
+      emit(state.copyWith(errorMessage: 'Failed to update transaction: $e'));
+      print('Error updating transaction: $e');
+    }
   }
 
-  Future<void> deleteTransaction(int key) async {
-    await _service.deleteTransaction(key);
-    await loadTransactions();
+  Future<void> deleteTransaction(String id) async { // Используем String id
+    try {
+      await _service.deleteTransaction(id);
+      await loadTransactions();
+    } catch (e) {
+      emit(state.copyWith(errorMessage: 'Failed to delete transaction: $e'));
+      print('Error deleting transaction: $e');
+    }
+  }
+
+  // Метод для получения транзакций, связанных с конкретной съемкой
+  List<OmegaTransactionModel> getTransactionsForShoot(String shootId) {
+    return state.transactions.where((tx) => tx.shootId == shootId).toList();
   }
 
   Future<void> clearAll() async {
-    await _service.clearAll();
-    emit(TransactionsState.initial());
+    try {
+      await _service.clearAll();
+      emit(TransactionsState.initial());
+    } catch (e) {
+      emit(state.copyWith(errorMessage: 'Failed to clear all transactions: $e'));
+      print('Error clearing all transactions: $e');
+    }
   }
 }

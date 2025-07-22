@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:omega_view_smart_plan_320/presentetion/pages/analytics/omega_view_analytics_page.dart';
-import 'package:omega_view_smart_plan_320/presentetion/pages/settings/omega_view_settings_page.dart';
+
 import 'package:omega_view_smart_plan_320/presentetion/pages/shoots/omega_view_shoots_page.dart';
 import 'package:omega_view_smart_plan_320/presentetion/pages/transaction/omega_view_transaction_page.dart';
+import 'package:omega_view_smart_plan_320/presentetion/pages/analytics/omega_view_analytics_page.dart';
+import 'package:omega_view_smart_plan_320/presentetion/pages/settings/omega_view_settings_page.dart';
+
 import 'package:omega_view_smart_plan_320/presentetion/themes/app_colors.dart';
 import 'package:omega_view_smart_plan_320/presentetion/themes/app_icons.dart';
 
 class OmegaBottomnavigationBar extends StatefulWidget {
-  const OmegaBottomnavigationBar({super.key});
+  const OmegaBottomnavigationBar({Key? key}) : super(key: key);
 
   @override
   State<OmegaBottomnavigationBar> createState() =>
@@ -16,7 +18,7 @@ class OmegaBottomnavigationBar extends StatefulWidget {
 }
 
 class _OmegaBottomnavigationBarState extends State<OmegaBottomnavigationBar> {
-  int selecIndaex = 0;
+  int _selectedIndex = 0;
 
   final List<Widget> _pages = [
     const KeyedSubtree(key: ValueKey(0), child: OmegaViewShootsPage()),
@@ -25,13 +27,13 @@ class _OmegaBottomnavigationBarState extends State<OmegaBottomnavigationBar> {
     const KeyedSubtree(key: ValueKey(3), child: OmegaViewSettingsPage()),
   ];
 
-  // Иконки и подписи
   final List<String> _icons = [
     AppIcons.btNavigator1,
     AppIcons.btNavigator2,
     AppIcons.btNavigator3,
     AppIcons.btNavigator4,
   ];
+
   final List<String> _labels = [
     'Shoots',
     'Transaction',
@@ -39,9 +41,9 @@ class _OmegaBottomnavigationBarState extends State<OmegaBottomnavigationBar> {
     'Settings',
   ];
 
-  void ontapItem(int index) {
+  void _onTapItem(int index) {
     setState(() {
-      selecIndaex = index;
+      _selectedIndex = index;
     });
   }
 
@@ -57,7 +59,7 @@ class _OmegaBottomnavigationBarState extends State<OmegaBottomnavigationBar> {
           opacity: anim,
           child: child,
         ),
-        child: _pages[selecIndaex],
+        child: _pages[_selectedIndex],
       ),
       bottomNavigationBar: SafeArea(
         child: Container(
@@ -67,9 +69,9 @@ class _OmegaBottomnavigationBarState extends State<OmegaBottomnavigationBar> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: List.generate(_icons.length, (i) {
-              final isSelected = selecIndaex == i;
+              final isSelected = _selectedIndex == i;
               return InkWell(
-                onTap: () => ontapItem(i),
+                onTap: () => _onTapItem(i),
                 borderRadius: BorderRadius.circular(24.r),
                 child: isSelected
                     ? Container(
@@ -93,11 +95,12 @@ class _OmegaBottomnavigationBarState extends State<OmegaBottomnavigationBar> {
                             Text(
                               _labels[i],
                               style: TextStyle(
-                                  color: AppColors.textWhite,
-                                  fontSize: 13.sp,
-                                  fontWeight: FontWeight.w400,
-                                  height: 1.38,
-                                  letterSpacing: -0.08),
+                                color: AppColors.textWhite,
+                                fontSize: 13.sp,
+                                fontWeight: FontWeight.w400,
+                                height: 1.38,
+                                letterSpacing: -0.08,
+                              ),
                             ),
                           ],
                         ),

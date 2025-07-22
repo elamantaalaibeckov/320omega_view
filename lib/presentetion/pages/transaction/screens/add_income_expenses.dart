@@ -1,25 +1,23 @@
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
 import 'package:omega_view_smart_plan_320/cubit/shoots/shoots_cubit.dart';
-import 'package:omega_view_smart_plan_320/cubit/shoots/shoots_state.dart';
+import 'package:omega_view_smart_plan_320/cubit/transactions/transactions_cubit.dart';
 import 'package:omega_view_smart_plan_320/model/omega_shoot_model.dart';
+import 'package:omega_view_smart_plan_320/model/omega_transaction_model.dart';
 import 'package:omega_view_smart_plan_320/presentetion/themes/app_colors.dart';
+import 'package:omega_view_smart_plan_320/presentetion/themes/app_icons.dart';
 import 'package:omega_view_smart_plan_320/presentetion/widgets/app_text.dart';
 import 'package:omega_view_smart_plan_320/presentetion/widgets/app_text_filed.dart';
-import 'package:uuid/uuid.dart'; // Для генерации уникальных ID
+import 'package:uuid/uuid.dart';
 
-// Предполагаем, что у вас есть TransactionCubit и TransactionModel
-// Если нет, вам нужно будет их создать, чтобы добавлять транзакции.
-// import 'package:omega_view_smart_plan_320/cubit/transactions/transactions_cubit.dart';
-// import 'package:omega_view_smart_plan_320/model/transaction_model.dart';
-
-// Модель для отдельного элемента расхода
+/// Для одного поля расхода
 class ExpenseItem {
-  final String id; // Уникальный ID для элемента расхода
+  final String id;
   final TextEditingController nameController;
   final TextEditingController priceController;
 
@@ -29,15 +27,23 @@ class ExpenseItem {
     required this.priceController,
   });
 
-  // Метод для очистки контроллеров при удалении элемента
   void dispose() {
     nameController.dispose();
     priceController.dispose();
   }
 }
 
+/// Страница добавления/редактирования транзакции
 class AddTransactionPage extends StatefulWidget {
-  const AddTransactionPage({Key? key}) : super(key: key);
+  /// Если передаём existing, то работаем в режиме редактирования
+  final OmegaTransactionModel? initialTx;
+  final OmegaShootModel? initialShoot;
+
+  const AddTransactionPage({
+    Key? key,
+    this.initialTx,
+    this.initialShoot,
+  }) : super(key: key);
 
   @override
   State<AddTransactionPage> createState() => _AddTransactionPageState();
@@ -45,58 +51,44 @@ class AddTransactionPage extends StatefulWidget {
 
 class _AddTransactionPageState extends State<AddTransactionPage>
     with SingleTickerProviderStateMixin {
-  late final TabController _tc;
+  late final TabController _tabController;
+  bool _isDirty = false; // флаг изменений
   int _tabIndex = 0;
 
-  // Общие контроллеры для обеих вкладок
   OmegaShootModel? _selectedShoot;
-  final TextEditingController _commentsCtrl = TextEditingController();
+  final TextEditingController _incomeAmountController = TextEditingController();
+  final TextEditingController _commentsController = TextEditingController();
   bool _isShootPickerOpen = false;
 
-  // Контроллеры и список для вкладки "Income"
-  final TextEditingController _incomeAmountCtrl = TextEditingController();
-
-  // Список и контроллеры для вкладки "Expenses"
   final List<ExpenseItem> _expenseItems = [];
-  final Uuid _uuid = const Uuid(); // Для генерации уникальных ID расходов
+  final Uuid _uuid = const Uuid();
+
+  bool get _isEditing => widget.initialTx != null;
 
   @override
   void initState() {
     super.initState();
-    _tc = TabController(length: 2, vsync: this)
-      ..addListener(() {
-        setState(() {
-          _tabIndex = _tc.index;
-          // Сбрасываем выбранную съемку и состояние списка при смене вкладки
-          _selectedShoot = null;
-          _isShootPickerOpen = false;
-          // Очищаем поля ввода при смене вкладки
-          _incomeAmountCtrl.clear();
-          _commentsCtrl.clear();
-          _expenseItems.forEach(
-              (item) => item.dispose()); // Очищаем контроллеры расходов
-          _expenseItems.clear(); // Очищаем список расходов
-          // Добавляем один пустой элемент расхода для начала
-          _addExpenseItem();
-        });
-      });
-    context.read<ShootsCubit>().loadShoots();
-    _addExpenseItem(); // Добавляем первый элемент расхода при инициализации
-  }
-
-  @override
-  void dispose() {
-    _tc.dispose();
-    _incomeAmountCtrl.dispose();
-    _commentsCtrl.dispose();
-    _expenseItems
-        .forEach((item) => item.dispose()); // Очищаем контроллеры всех расходов
-    super.dispose();
-  }
-
-  // Метод для добавления нового элемента расхода
-  void _addExpenseItem() {
-    setState(() {
+    // Если редактируем, префилл контроллеров
+    if (_isEditing) {
+      final tx = widget.initialTx!;
+      _selectedShoot = widget.initialShoot;
+      if (tx.category == 'Income') {
+        _tabIndex = 0;
+        _incomeAmountController.text = tx.amount.toStringAsFixed(0);
+        _commentsController.text = tx.note ?? '';
+      } else {
+        _tabIndex = 1;
+        _expenseItems.add(
+          ExpenseItem(
+            id: _uuid.v4(),
+            nameController: TextEditingController(text: tx.note),
+            priceController:
+                TextEditingController(text: tx.amount.toStringAsFixed(0)),
+          ),
+        );
+      }
+    } else {
+      // при добавлении в расходах создаём пустой item
       _expenseItems.add(
         ExpenseItem(
           id: _uuid.v4(),
@@ -104,203 +96,313 @@ class _AddTransactionPageState extends State<AddTransactionPage>
           priceController: TextEditingController(),
         ),
       );
-    });
+    }
+
+    // слушатели для dirty‑флага
+    _incomeAmountController.addListener(_markDirty);
+    _commentsController.addListener(_markDirty);
+
+    _tabController = TabController(length: 2, vsync: this)
+      ..addListener(_handleTabSelection);
+
+    context.read<ShootsCubit>().loadShoots();
   }
 
-  // Метод для удаления элемента расхода
-  void _removeExpenseItem(String id) {
+  void _markDirty([_]) {
+    if (!_isDirty) setState(() => _isDirty = true);
+  }
+
+  void _handleTabSelection() {
     setState(() {
-      final itemToRemove = _expenseItems.firstWhere((item) => item.id == id);
-      itemToRemove.dispose(); // Очищаем контроллеры перед удалением
-      _expenseItems.removeWhere((item) => item.id == id);
+      _tabIndex = _tabController.index;
+      _selectedShoot = null;
+      _isShootPickerOpen = false;
+      _incomeAmountController.clear();
+      _commentsController.clear();
+      _disposeExpenseItems();
+      _expenseItems.clear();
+      if (_tabIndex == 1) _addExpenseItem();
+      _isDirty = true;
     });
   }
 
-  // Метод для расчета общей суммы расходов
-  double _calculateTotalExpenses() {
-    double total = 0.0;
-    for (var item in _expenseItems) {
-      final price = double.tryParse(item.priceController.text);
-      if (price != null) {
-        total += price;
+  @override
+  void dispose() {
+    _tabController.removeListener(_handleTabSelection);
+    _tabController.dispose();
+    _incomeAmountController.dispose();
+    _commentsController.dispose();
+    _disposeExpenseItems();
+    super.dispose();
+  }
+
+  void _disposeExpenseItems() {
+    for (var item in _expenseItems) item.dispose();
+  }
+
+  void _addExpenseItem() {
+    // валидируем предыдущий
+    if (_expenseItems.isNotEmpty) {
+      final last = _expenseItems.last;
+      if (last.nameController.text.trim().isEmpty ||
+          last.priceController.text.trim().isEmpty) {
+        _showSnackBar(
+          'Заполните все поля текущего расхода перед добавлением нового.',
+          Colors.red,
+        );
+        return;
       }
     }
-    return total;
-  }
-
-  // Метод для добавления транзакции
-  void _addTransaction() {
-    if (_selectedShoot == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Пожалуйста, выберите съемку.'),
-          backgroundColor: Colors.red,
+    setState(() {
+      _expenseItems.add(
+        ExpenseItem(
+          id: _uuid.v4(),
+          nameController: TextEditingController()..addListener(_markDirty),
+          priceController: TextEditingController()..addListener(_markDirty),
         ),
       );
+      _isDirty = true;
+    });
+  }
+
+  void _removeExpenseItem(String id) {
+    setState(() {
+      final idx = _expenseItems.indexWhere((e) => e.id == id);
+      if (idx != -1) {
+        _expenseItems[idx].dispose();
+        _expenseItems.removeAt(idx);
+        if (_expenseItems.isEmpty) _addExpenseItem();
+        _isDirty = true;
+      }
+    });
+  }
+
+  double _calculateTotalExpenses() {
+    return _expenseItems.fold(0.0, (sum, item) {
+      final p = double.tryParse(item.priceController.text) ?? 0;
+      return sum + p;
+    });
+  }
+
+  Future<void> _saveTransaction() async {
+    if (_selectedShoot == null) {
+      _showSnackBar('Пожалуйста, выберите съёмку.', Colors.red);
       return;
+    }
+
+    final cubit = context.read<TransactionsCubit>();
+
+    // Если мы в режиме редактирования — удаляем старую запись
+    if (_isEditing) {
+      await cubit.deleteTransaction(widget.initialTx!.id);
     }
 
     if (_tabIndex == 0) {
       // Income
-      final double? amount = double.tryParse(_incomeAmountCtrl.text);
-      if (amount == null || amount <= 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Пожалуйста, введите корректную сумму дохода.'),
-            backgroundColor: Colors.red,
-          ),
-        );
+      final amount = double.tryParse(_incomeAmountController.text) ?? 0;
+      if (amount <= 0) {
+        _showSnackBar('Введите корректную сумму дохода.', Colors.red);
         return;
       }
-      // Логика добавления дохода
-      /*
-      final newTransaction = TransactionModel(
+      final tx = OmegaTransactionModel(
         id: _uuid.v4(),
+        shootId: _selectedShoot!.id,
         amount: amount,
-        type: TransactionType.income,
-        shootId: _selectedShoot!.id,
-        comments: _commentsCtrl.text.isNotEmpty ? _commentsCtrl.text : null,
+        category: 'Income',
         date: DateTime.now(),
+        note:
+            _commentsController.text.isEmpty ? null : _commentsController.text,
       );
-      context.read<TransactionsCubit>().addTransaction(newTransaction);
-      */
+      await cubit.addTransaction(tx);
     } else {
-      // Expenses
-      if (_expenseItems.isEmpty ||
-          _expenseItems.any((item) =>
-              item.nameController.text.isEmpty ||
-              double.tryParse(item.priceController.text) == null ||
-              double.tryParse(item.priceController.text)! <= 0)) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Пожалуйста, заполните все поля расходов корректно.'),
-            backgroundColor: Colors.red,
-          ),
+      // Expenses: по одной транзакции на каждую статью расхода
+      for (var item in _expenseItems) {
+        final name = item.nameController.text.trim();
+        final price = double.tryParse(item.priceController.text) ?? 0;
+        if (name.isEmpty || price <= 0) continue;
+        final tx = OmegaTransactionModel(
+          id: _uuid.v4(),
+          shootId: _selectedShoot!.id,
+          amount: price,
+          category: 'Expense',
+          date: DateTime.now(),
+          note: name,
         );
-        return;
+        await cubit.addTransaction(tx);
       }
-      // Логика добавления расходов
-      /*
-      // Можно создать одну транзакцию с общей суммой или несколько отдельных
-      final totalExpenses = _calculateTotalExpenses();
-      final expenseDetails = _expenseItems.map((item) => {
-        'name': item.nameController.text,
-        'price': double.tryParse(item.priceController.text) ?? 0.0,
-      }).toList();
-
-      final newTransaction = TransactionModel(
-        id: _uuid.v4(),
-        amount: totalExpenses,
-        type: TransactionType.expense,
-        shootId: _selectedShoot!.id,
-        comments: _commentsCtrl.text.isNotEmpty ? _commentsCtrl.text : null,
-        date: DateTime.now(),
-        // Возможно, добавить поле для деталей расходов, если нужно хранить каждый пункт
-        // details: expenseDetails,
-      );
-      context.read<TransactionsCubit>().addTransaction(newTransaction);
-      */
     }
 
-    Navigator.pop(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Транзакция успешно добавлена!'),
-        backgroundColor: AppColors.mainAccent,
+    Navigator.of(context).pop();
+    _showSnackBar(
+      _isEditing ? 'Транзакция обновлена!' : 'Транзакция успешно добавлена!',
+      AppColors.mainAccent,
+    );
+  }
+
+  Future<void> _confirmDelete() async {
+    final confirm = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (_) => CupertinoAlertDialog(
+        title: Text('Delete Transaction?', style: TextStyle(fontSize: 17.sp)),
+        content: Text(
+          'If you delete this transaction, you will not be able to recover it.',
+          style: TextStyle(fontSize: 13.sp),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            child: Text('Cancel'),
+            onPressed: () => Navigator.of(context).pop(false),
+          ),
+          CupertinoDialogAction(
+            child: Text('Delete', style: TextStyle(color: Colors.red)),
+            onPressed: () => Navigator.of(context).pop(true),
+          ),
+        ],
       ),
     );
+    if (confirm == true) {
+      await context
+          .read<TransactionsCubit>()
+          .deleteTransaction(widget.initialTx!.id);
+      Navigator.of(context).pop();
+      _showSnackBar('Транзакция удалена', AppColors.mainAccent);
+    }
+  }
+
+  Future<bool> _onWillPop() async {
+    if (!_isDirty) return true;
+    final leave = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (_) => CupertinoAlertDialog(
+        title: Text('Leave the page?', style: TextStyle(fontSize: 17.sp)),
+        content: Text(
+          'You have unsaved changes. Are you sure you want to leave?',
+          style: TextStyle(fontSize: 13.sp),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            child: Text('Cancel'),
+            onPressed: () => Navigator.of(context).pop(false),
+          ),
+          CupertinoDialogAction(
+            child: Text('Leave', style: TextStyle(fontWeight: FontWeight.w600)),
+            onPressed: () => Navigator.of(context).pop(true),
+          ),
+        ],
+      ),
+    );
+    return leave ?? false;
+  }
+
+  void _showSnackBar(String msg, Color bg) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(msg), backgroundColor: bg));
   }
 
   @override
   Widget build(BuildContext context) {
     final accent = AppColors.mainAccent;
-    final state = context.watch<ShootsCubit>().state;
-    final completedShoots = state.shoots.where((s) => !s.isPlanned).toList();
+    final shoots = context
+        .watch<ShootsCubit>()
+        .state
+        .shoots
+        .where((s) => !s.isPlanned)
+        .toList();
 
-    return Scaffold(
-      backgroundColor: AppColors.bgColor,
-      appBar: AppBar(
-        automaticallyImplyLeading: true,
-        backgroundColor: AppColors.bottomNavigatorAppBarColor,
-        elevation: 0,
-        leading: const BackButton(color: Colors.white),
-        title: Text(
-          'Add Transaction',
-          style: TextStyle(
-            color: AppColors.textWhite,
-            fontSize: 20.sp,
-            fontWeight: FontWeight.w500,
+    return WillPopScope(
+      onWillPop: _onWillPop,
+      child: Scaffold(
+        backgroundColor: AppColors.bgColor,
+        appBar: AppBar(
+          backgroundColor: AppColors.bottomNavigatorAppBarColor,
+          elevation: 0,
+          leading: const BackButton(color: Colors.white),
+          title: Text(
+            _isEditing ? 'Edit Transaction' : 'Add Transaction',
+            style: TextStyle(
+                color: Colors.white,
+                fontSize: 20.sp,
+                fontWeight: FontWeight.w500),
           ),
+          centerTitle: true,
+          actions: [
+            if (_isEditing)
+              IconButton(
+                padding: EdgeInsets.symmetric(horizontal: 16.w),
+                icon: Image.asset(
+                  AppIcons.deleteshoot,
+                  width: 24.w,
+                  height: 24.h,
+                ),
+                onPressed: () => _confirmDelete(),
+              ),
+          ],
         ),
-        centerTitle: true,
-      ),
-      body: Stack(
-        children: [
-          Padding(
-            padding: EdgeInsets.only(bottom: 80.h),
-            child: Column(
-              children: [
-                Padding(
-                  padding:
-                      EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-                  child: TabBar(
-                    controller: _tc,
-                    indicator: BoxDecoration(
-                      border: Border.all(color: accent, width: 1.5),
-                      borderRadius: BorderRadius.circular(16.r),
+        body: Stack(
+          children: [
+            Padding(
+              padding: EdgeInsets.only(bottom: 80.h),
+              child: Column(
+                children: [
+                  Padding(
+                    padding:
+                        EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                    child: TabBar(
+                      controller: _tabController,
+                      indicator: BoxDecoration(
+                        border: Border.all(color: accent, width: 1.5),
+                        borderRadius: BorderRadius.circular(16.r),
+                      ),
+                      indicatorSize: TabBarIndicatorSize.tab,
+                      labelColor: AppColors.textWhite,
+                      unselectedLabelColor: AppColors.textgrey,
+                      labelStyle: TextStyle(
+                          fontSize: 14.sp, fontWeight: FontWeight.w500),
+                      tabs: const [Tab(text: 'Income'), Tab(text: 'Expenses')],
                     ),
-                    indicatorSize: TabBarIndicatorSize.tab,
-                    labelColor: AppColors.textWhite,
-                    unselectedLabelColor: AppColors.textgrey,
-                    labelStyle:
-                        TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w500),
-                    tabs: const [Tab(text: 'Income'), Tab(text: 'Expenses')],
                   ),
-                ),
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: EdgeInsets.symmetric(horizontal: 16.w),
-                    child: _tabIndex == 0
-                        ? _buildIncomeForm(completedShoots)
-                        : _buildExpensesForm(completedShoots),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: EdgeInsets.symmetric(horizontal: 16.w),
+                      child: _tabIndex == 0
+                          ? _buildIncomeForm(shoots)
+                          : _buildExpensesForm(shoots),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          Positioned(
-            bottom: 16.h,
-            left: 16.w,
-            right: 16.w,
-            child: SizedBox(
-              height: 52.h,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: accent,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30.r),
+            Positioned(
+              bottom: 16.h,
+              left: 16.w,
+              right: 16.w,
+              child: SizedBox(
+                height: 52.h,
+                child: ElevatedButton(
+                  onPressed: _saveTransaction,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: accent,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30.r)),
                   ),
-                ),
-                onPressed: _addTransaction,
-                child: Text(
-                  'Add',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16.sp,
-                    fontWeight: FontWeight.w600,
+                  child: Text(
+                    _isEditing ? 'Save' : 'Add',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16.sp,
+                        fontWeight: FontWeight.w600),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  // Метод для построения выбранной съемки в поле выбора
   Widget _buildSelectedShoot(OmegaShootModel shoot) {
-    final combinedDateTime = DateTime(
+    final dt = DateTime(
       shoot.date.year,
       shoot.date.month,
       shoot.date.day,
@@ -312,27 +414,22 @@ class _AddTransactionPageState extends State<AddTransactionPage>
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          DateFormat('MMM dd, yyyy, HH:mm').format(combinedDateTime),
+          DateFormat('MMM d, yyyy, h:mm a').format(dt),
           style: TextStyle(
-            color: AppColors.textWhite,
-            fontSize: 14.sp,
-            fontWeight: FontWeight.w500,
-          ),
+              color: Colors.white,
+              fontSize: 14.sp,
+              fontWeight: FontWeight.w500),
         ),
         SizedBox(height: 4.h),
         Text(
-          shoot.clientName,
-          style: TextStyle(
-            color: AppColors.textgrey,
-            fontSize: 14.sp,
-          ),
+          '${shoot.clientName}, ${shoot.address}',
+          style: TextStyle(color: AppColors.textgrey, fontSize: 14.sp),
         ),
       ],
     );
   }
 
-  // Новая форма для вкладки "Income"
-  Widget _buildIncomeForm(List<OmegaShootModel> completedShoots) {
+  Widget _buildIncomeForm(List<OmegaShootModel> shoots) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -341,88 +438,71 @@ class _AddTransactionPageState extends State<AddTransactionPage>
         SizedBox(height: 8.h),
         AppTextField(
           hintText: 'Add Income',
-          controller: _incomeAmountCtrl,
+          controller: _incomeAmountController,
           isNumberOnly: true,
         ),
         SizedBox(height: 16.h),
         AppTexts(texTs: 'Select Shoot'),
         SizedBox(height: 8.h),
-        GestureDetector(
-          onTap: () {
-            setState(() {
-              _isShootPickerOpen = !_isShootPickerOpen;
-            });
-          },
-          child: Container(
-            padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 14.h),
-            decoration: BoxDecoration(
-              color: AppColors.filedGrey,
-              borderRadius: BorderRadius.circular(16.r),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: (_selectedShoot == null)
-                      ? Text(
-                          'Select',
-                          style: TextStyle(
-                            color: AppColors.textgrey,
-                            fontSize: 14.sp,
-                          ),
-                        )
-                      : _buildSelectedShoot(_selectedShoot!),
-                ),
-                Icon(
-                  _isShootPickerOpen
-                      ? Icons.arrow_drop_up
-                      : Icons.arrow_drop_down,
-                  color: AppColors.textgrey,
-                ),
-              ],
-            ),
-          ),
+        _buildShootPickerButton(),
+        if (_isShootPickerOpen) _buildShootList(shoots),
+        SizedBox(height: 16.h),
+        AppTexts(texTs: 'Comments (optional)'),
+        SizedBox(height: 8.h),
+        AppTextField(
+          hintText: 'Add Comments',
+          controller: _commentsController,
         ),
+        SizedBox(height: 24.h),
+      ],
+    );
+  }
+
+  Widget _buildExpensesForm(List<OmegaShootModel> shoots) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(height: 16.h),
+        AppTexts(texTs: 'Select Shoot'),
+        SizedBox(height: 8.h),
+        _buildShootPickerButton(),
+
+        // список съёмок с BouncingScrollPhysics
         if (_isShootPickerOpen)
           Padding(
             padding: EdgeInsets.only(top: 16.h),
             child: Container(
-              // 3 карточки по 80.h + 2 разделителя по 12.h + паддинги по 12.h сверху и снизу = 288.h
               height: 288.h,
               decoration: BoxDecoration(
                 color: AppColors.filedGrey,
                 borderRadius: BorderRadius.circular(16.r),
               ),
               child: ListView.separated(
-                // теперь список сам скроллится
+                shrinkWrap: true,
+                physics: const BouncingScrollPhysics(),
                 padding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 16.w),
-                physics: AlwaysScrollableScrollPhysics(),
-                itemCount: completedShoots.length,
+                itemCount: shoots.length,
                 separatorBuilder: (_, __) => SizedBox(height: 12.h),
                 itemBuilder: (context, i) {
-                  final shoot = completedShoots[i];
+                  final shoot = shoots[i];
                   final isSel = _selectedShoot?.id == shoot.id;
-                  final combinedDateTime = DateTime(
-                    shoot.date.year,
-                    shoot.date.month,
-                    shoot.date.day,
-                    shoot.time.hour,
-                    shoot.time.minute,
-                  );
-                  final displayPhotos =
-                      shoot.shootReferencesPaths.take(1).toList();
-                  final remainingCount =
-                      shoot.shootReferencesPaths.length - displayPhotos.length;
-
+                  final dt = DateTime(shoot.date.year, shoot.date.month,
+                      shoot.date.day, shoot.time.hour, shoot.time.minute);
+                  File? preview;
+                  final photos = shoot.finalShotsPaths ?? [];
+                  if (photos.isNotEmpty) {
+                    final f = File(photos.first);
+                    if (f.existsSync()) preview = f;
+                  }
                   return InkWell(
-                    onTap: () {
-                      setState(() {
-                        _selectedShoot = shoot;
-                        _isShootPickerOpen = false;
-                      });
-                    },
+                    onTap: () => setState(() {
+                      _selectedShoot = shoot;
+                      _isShootPickerOpen = false;
+                    }),
                     borderRadius: BorderRadius.circular(16.r),
                     child: Container(
                       height: 80.h,
+                      padding: EdgeInsets.symmetric(horizontal: 12.w),
                       decoration: BoxDecoration(
                         color: AppColors.cardGrey,
                         borderRadius: BorderRadius.circular(16.r),
@@ -432,7 +512,6 @@ class _AddTransactionPageState extends State<AddTransactionPage>
                           width: 1.5,
                         ),
                       ),
-                      padding: EdgeInsets.symmetric(horizontal: 12.w),
                       child: Row(
                         children: [
                           Expanded(
@@ -441,56 +520,68 @@ class _AddTransactionPageState extends State<AddTransactionPage>
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  DateFormat('MMM d, yyyy, h:mm a')
-                                      .format(combinedDateTime),
+                                  DateFormat('MMM d, yyyy, h:mm a').format(dt),
                                   style: TextStyle(
-                                    color: AppColors.textWhite,
-                                    fontSize: 14.sp,
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                                      color: Colors.white,
+                                      fontSize: 14.sp,
+                                      fontWeight: FontWeight.w500),
                                 ),
                                 SizedBox(height: 4.h),
                                 Text(
                                   shoot.clientName,
                                   style: TextStyle(
-                                    color: AppColors.textgrey,
-                                    fontSize: 14.sp,
-                                  ),
+                                      color: AppColors.textgrey,
+                                      fontSize: 14.sp),
                                 ),
                               ],
                             ),
                           ),
-                          if (displayPhotos.isNotEmpty) ...[
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(12.r),
-                              child: Image.file(
-                                File(displayPhotos.first),
-                                width: 56.w,
-                                height: 56.h,
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                            SizedBox(width: 8.w),
-                            if (remainingCount > 0)
-                              Container(
-                                width: 56.w,
-                                height: 56.h,
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8.r),
+                            child: preview != null
+                                ? Image.file(preview,
+                                    width: 40.w,
+                                    height: 40.h,
+                                    fit: BoxFit.cover)
+                                : Container(
+                                    width: 40.w,
+                                    height: 40.h,
+                                    decoration: BoxDecoration(
+                                      color:
+                                          AppColors.textgrey.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(8.r),
+                                    ),
+                                    child: Icon(
+                                      photos.isNotEmpty
+                                          ? Icons.broken_image
+                                          : Icons.no_photography_outlined,
+                                      color: AppColors.textgrey,
+                                      size: 24.r,
+                                    ),
+                                  ),
+                          ),
+                          if (photos.length > 1)
+                            Padding(
+                              padding: EdgeInsets.only(left: 8.w),
+                              child: Container(
+                                width: 40.w,
+                                height: 40.h,
                                 decoration: BoxDecoration(
-                                  color: AppColors.cardGrey,
-                                  borderRadius: BorderRadius.circular(12.r),
+                                  color: AppColors.grey2,
+                                  borderRadius: BorderRadius.circular(8.r),
                                 ),
                                 child: Center(
                                   child: Text(
-                                    '+$remainingCount',
+                                    '+${photos.length - 1}',
                                     style: TextStyle(
                                       color: AppColors.textWhite,
-                                      fontSize: 15.sp,
-                                      fontWeight: FontWeight.w600,
+                                      fontSize: 14.sp,
+                                      fontWeight: FontWeight.w500,
                                     ),
                                   ),
                                 ),
                               ),
-                          ],
+                            ),
                         ],
                       ),
                     ),
@@ -499,291 +590,295 @@ class _AddTransactionPageState extends State<AddTransactionPage>
               ),
             ),
           ),
-        SizedBox(height: 16.h),
-        AppTexts(texTs: 'Comments (optional)'),
-        SizedBox(height: 8.h),
-        AppTextField(hintText: 'Add Comments', controller: _commentsCtrl),
-        SizedBox(height: 24.h),
-      ],
-    );
-  }
 
-  // Новая форма для вкладки "Expenses"
-  Widget _buildExpensesForm(List<OmegaShootModel> completedShoots) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
         SizedBox(height: 16.h),
-        AppTexts(texTs: 'Select Shoot'),
+        AppTexts(texTs: 'Expenses'),
         SizedBox(height: 8.h),
-        GestureDetector(
-          onTap: () {
-            setState(() {
-              _isShootPickerOpen = !_isShootPickerOpen;
-            });
-          },
-          child: Container(
-            padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 14.h),
-            decoration: BoxDecoration(
-              color: AppColors.filedGrey, // Цвет фона поля выбора
-              borderRadius: BorderRadius.circular(16.r),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: (_selectedShoot == null)
-                      ? Text(
-                          'Select',
-                          style: TextStyle(
-                            color: AppColors.textgrey,
-                            fontSize: 14.sp,
-                          ),
-                        )
-                      : _buildSelectedShoot(_selectedShoot!),
-                ),
-                Icon(
-                  _isShootPickerOpen
-                      ? Icons.arrow_drop_up
-                      : Icons.arrow_drop_down,
-                  color: AppColors.textgrey,
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (_isShootPickerOpen)
-          Padding(
-            padding: EdgeInsets.only(top: 16.h),
-            child: Container(
-              decoration: BoxDecoration(
-                color: AppColors.filedGrey, // Цвет фона для выпадающего списка
-                borderRadius: BorderRadius.circular(16.r),
-              ),
-              child: ListView.separated(
-                shrinkWrap: true,
-                physics: NeverScrollableScrollPhysics(),
-                padding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 16.w),
-                itemCount: completedShoots.length,
-                separatorBuilder: (_, __) => SizedBox(height: 12.h),
-                itemBuilder: (context, i) {
-                  final shoot = completedShoots[i];
-                  final isSel = _selectedShoot?.id == shoot.id;
-                  final combinedDateTime = DateTime(
-                    shoot.date.year,
-                    shoot.date.month,
-                    shoot.date.day,
-                    shoot.time.hour,
-                    shoot.time.minute,
-                  );
-                  final displayPhotos =
-                      shoot.shootReferencesPaths.take(1).toList();
-                  final remainingCount =
-                      shoot.shootReferencesPaths.length - displayPhotos.length;
 
-                  return InkWell(
-                    onTap: () {
-                      setState(() {
-                        _selectedShoot = shoot;
-                        _isShootPickerOpen = false;
-                      });
-                    },
-                    borderRadius: BorderRadius.circular(16.r),
-                    child: Container(
-                      height: 80.h,
-                      decoration: BoxDecoration(
-                        color: AppColors.cardGrey, // Цвет фона карточки
-                        borderRadius: BorderRadius.circular(16.r),
-                        border: Border.all(
-                          color:
-                              isSel ? AppColors.mainAccent : AppColors.cardGrey,
-                          width: 1.5,
-                        ),
-                      ),
-                      padding: EdgeInsets.symmetric(horizontal: 12.w),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  DateFormat('MMM d, yyyy, h:mm a')
-                                      .format(combinedDateTime),
-                                  style: TextStyle(
-                                    color: AppColors.textWhite,
-                                    fontSize: 14.sp,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                SizedBox(height: 4.h),
-                                Text(
-                                  shoot.clientName,
-                                  style: TextStyle(
-                                    color: AppColors.textgrey,
-                                    fontSize: 14.sp,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          if (displayPhotos.isNotEmpty) ...[
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(12.r),
-                              child: Image.file(
-                                File(displayPhotos.first),
-                                width: 56.w,
-                                height: 56.h,
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                            SizedBox(width: 8.w),
-                            if (remainingCount > 0)
-                              Container(
-                                width: 56.w,
-                                height: 56.h,
-                                decoration: BoxDecoration(
-                                  color: AppColors.cardGrey,
-                                  borderRadius: BorderRadius.circular(12.r),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    '+$remainingCount',
-                                    style: TextStyle(
-                                      color: AppColors.textWhite,
-                                      fontSize: 15.sp,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-        SizedBox(height: 16.h),
-        AppTexts(texTs: 'Expenses'), // Заголовок для списка расходов
-        SizedBox(height: 8.h),
-        // Динамический список полей для расходов
+        // список полей расходов с BouncingScrollPhysics
         ListView.builder(
           shrinkWrap: true,
-          physics: NeverScrollableScrollPhysics(),
+          physics: const BouncingScrollPhysics(),
           itemCount: _expenseItems.length,
-          itemBuilder: (context, index) {
-            final expense = _expenseItems[index];
+          itemBuilder: (context, idx) {
+            final e = _expenseItems[idx];
             return Padding(
-              padding: EdgeInsets.only(
-                  bottom: 12.h), // Отступ между элементами расхода
+              padding: EdgeInsets.only(bottom: 12.h),
               child: Container(
                 padding: EdgeInsets.all(16.w),
                 decoration: BoxDecoration(
                   color: AppColors.filedGrey,
-                  borderRadius: BorderRadius.circular(16.r),
+                  borderRadius: BorderRadius.circular(8.r),
                 ),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     AppTextField(
                       hintText: 'Add name',
-                      controller: expense.nameController,
-                      onChanged: (_) =>
-                          setState(() {}), // Для обновления кнопки "Add"
+                      controller: e.nameController,
+                      onChanged: (_) => setState(() {}),
                     ),
                     SizedBox(height: 12.h),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: AppTextField(
-                            hintText: 'Add Price',
-                            controller: expense.priceController,
-                            isNumberOnly: true,
-                            onChanged: (_) => setState(
-                                () {}), // Для обновления общей суммы и кнопки "Add"
-                          ),
-                        ),
-                        SizedBox(width: 12.w),
-                        // Кнопка удаления, если элементов больше одного
-                        if (_expenseItems.length > 1)
-                          InkWell(
-                            onTap: () => _removeExpenseItem(expense.id),
+                    AppTextField(
+                      hintText: 'Add Price',
+                      controller: e.priceController,
+                      isNumberOnly: true,
+                      onChanged: (_) => setState(() {}),
+                    ),
+                    if (idx > 0)
+                      Padding(
+                        padding: EdgeInsets.only(top: 8.h),
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: InkWell(
+                            onTap: () => _removeExpenseItem(e.id),
                             borderRadius: BorderRadius.circular(8.r),
                             child: Container(
-                              width: 48.w, // Ширина кнопки удаления
-                              height: 48.h, // Высота кнопки удаления
+                              width: 48.w,
+                              height: 48.h,
                               decoration: BoxDecoration(
-                                color: AppColors
-                                    .bottomNavigatorAppBarColor, // Цвет фона кнопки
+                                color: AppColors.bottomNavigatorAppBarColor,
                                 borderRadius: BorderRadius.circular(8.r),
                               ),
                               child: Center(
-                                child: Icon(Icons.delete_outline,
-                                    color: AppColors.textgrey, size: 24.r),
+                                child: Icon(
+                                  Icons.delete_outline,
+                                  color: AppColors.textgrey,
+                                  size: 24.r,
+                                ),
                               ),
                             ),
                           ),
-                      ],
-                    ),
+                        ),
+                      ),
                   ],
                 ),
               ),
             );
           },
         ),
+
         SizedBox(height: 16.h),
         SizedBox(
           width: double.infinity,
           height: 52.h,
           child: ElevatedButton(
+            onPressed: _addExpenseItem,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.mainAccent,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(30.r),
-              ),
+                  borderRadius: BorderRadius.circular(30.r)),
             ),
-            onPressed: _addExpenseItem, // Добавляем новый элемент расхода
-            child: Text(
-              'Add Expense',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16.sp,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            child: Text('Add Expense',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w600)),
           ),
         ),
+
         SizedBox(height: 16.h),
-        // Общая сумма расходов
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'Total',
-              style: TextStyle(
-                color: AppColors.textWhite,
-                fontSize: 16.sp,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            Text(
-              '\$${_calculateTotalExpenses().toStringAsFixed(2)}', // Форматируем до двух знаков после запятой
-              style: TextStyle(
-                color: AppColors.textWhite,
-                fontSize: 16.sp,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            Text('Total',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w600)),
+            Text('\$${_calculateTotalExpenses().toStringAsFixed(2)}',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w600)),
           ],
         ),
+
         SizedBox(height: 16.h),
         AppTexts(texTs: 'Comments (optional)'),
         SizedBox(height: 8.h),
-        AppTextField(hintText: 'Add Comments', controller: _commentsCtrl),
+        AppTextField(
+          hintText: 'Add Comments',
+          controller: _commentsController,
+        ),
         SizedBox(height: 24.h),
       ],
+    );
+  }
+
+  Widget _buildShootPickerButton() {
+    return GestureDetector(
+      onTap: () => setState(() => _isShootPickerOpen = !_isShootPickerOpen),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 14.h),
+        decoration: BoxDecoration(
+          color: AppColors.filedGrey,
+          borderRadius: BorderRadius.circular(16.r),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: _selectedShoot == null
+                  ? Text('Select',
+                      style:
+                          TextStyle(color: AppColors.textgrey, fontSize: 14.sp))
+                  : _buildSelectedShoot(_selectedShoot!),
+            ),
+            if (_selectedShoot != null &&
+                _selectedShoot!.finalShotsPaths != null &&
+                _selectedShoot!.finalShotsPaths!.isNotEmpty)
+              Padding(
+                padding: EdgeInsets.only(right: 8.w),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8.r),
+                  child: Image.file(
+                    File(_selectedShoot!.finalShotsPaths!.first),
+                    width: 40.w,
+                    height: 40.h,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      width: 40.w,
+                      height: 40.h,
+                      color: AppColors.textgrey.withOpacity(0.2),
+                      child: Icon(Icons.broken_image,
+                          color: AppColors.textgrey, size: 24.r),
+                    ),
+                  ),
+                ),
+              ),
+            Icon(
+              _isShootPickerOpen ? Icons.arrow_drop_up : Icons.arrow_drop_down,
+              color: AppColors.textgrey,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildShootList(List<OmegaShootModel> shoots,
+      {bool isExpanded = false}) {
+    final visibleCount = isExpanded ? shoots.length : min(shoots.length, 3);
+    final itemHeight = 80.h;
+    final separator = 12.h;
+    final totalHeight =
+        visibleCount * itemHeight + max(0, visibleCount - 1) * separator + 24.h;
+
+    return Padding(
+      padding: EdgeInsets.only(top: 16.h),
+      child: Container(
+        height: isExpanded ? null : totalHeight,
+        decoration: BoxDecoration(
+          color: AppColors.filedGrey,
+          borderRadius: BorderRadius.circular(16.r),
+        ),
+        child: ListView.separated(
+          shrinkWrap: isExpanded,
+          physics: isExpanded
+              ? const NeverScrollableScrollPhysics()
+              : const BouncingScrollPhysics(),
+          padding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 16.w),
+          itemCount: shoots.length,
+          separatorBuilder: (_, __) => SizedBox(height: separator),
+          itemBuilder: (context, i) {
+            final shoot = shoots[i];
+            final isSel = _selectedShoot?.id == shoot.id;
+            final dt = DateTime(shoot.date.year, shoot.date.month,
+                shoot.date.day, shoot.time.hour, shoot.time.minute);
+            File? preview;
+            final photos = shoot.finalShotsPaths ?? [];
+            if (photos.isNotEmpty) {
+              final f = File(photos.first);
+              if (f.existsSync()) preview = f;
+            }
+            return InkWell(
+              onTap: () => setState(() {
+                _selectedShoot = shoot;
+                _isShootPickerOpen = false;
+              }),
+              borderRadius: BorderRadius.circular(16.r),
+              child: Container(
+                height: itemHeight,
+                padding: EdgeInsets.symmetric(horizontal: 12.w),
+                decoration: BoxDecoration(
+                  color: AppColors.cardGrey,
+                  borderRadius: BorderRadius.circular(16.r),
+                  border: Border.all(
+                      color: isSel ? AppColors.mainAccent : AppColors.cardGrey,
+                      width: 1.5),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            DateFormat('MMM d, yyyy, h:mm a').format(dt),
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 14.sp,
+                                fontWeight: FontWeight.w500),
+                          ),
+                          SizedBox(height: 4.h),
+                          Text(
+                            shoot.clientName,
+                            style: TextStyle(
+                                color: AppColors.textgrey, fontSize: 14.sp),
+                          ),
+                        ],
+                      ),
+                    ),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8.r),
+                      child: preview != null
+                          ? Image.file(preview,
+                              width: 40.w, height: 40.h, fit: BoxFit.cover)
+                          : Container(
+                              width: 40.w,
+                              height: 40.h,
+                              decoration: BoxDecoration(
+                                color: AppColors.textgrey.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(8.r),
+                              ),
+                              child: Icon(
+                                  photos.isNotEmpty
+                                      ? Icons.broken_image
+                                      : Icons.no_photography_outlined,
+                                  color: AppColors.textgrey,
+                                  size: 24.r),
+                            ),
+                    ),
+                    if (photos.length > 1)
+                      Padding(
+                        padding: EdgeInsets.only(left: 8.w),
+                        child: Container(
+                          width: 40.w,
+                          height: 40.h,
+                          decoration: BoxDecoration(
+                            color: AppColors.grey2,
+                            borderRadius: BorderRadius.circular(8.r),
+                          ),
+                          child: Center(
+                            child: Text(
+                              '+${photos.length - 1}',
+                              style: TextStyle(
+                                color: AppColors.textWhite,
+                                fontSize: 14.sp,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
     );
   }
 }

@@ -8,27 +8,24 @@ class TransactionHiveService {
 
   /// Инициализация: адаптерди каттоо жана боксту ачуу
   static Future<void> init() async {
-    if (!Hive.isAdapterRegistered(1)) {
-      Hive.registerAdapter(OmegaTransactionModelAdapter());
-    }
+    // Адаптер для OmegaTransactionModel должен быть зарегистрирован в main.dart
     await Hive.openBox<OmegaTransactionModel>(_boxName);
   }
 
-  Box<OmegaTransactionModel> get _box =>
-      Hive.box<OmegaTransactionModel>(_boxName);
+  Box<OmegaTransactionModel> get _box => Hive.box<OmegaTransactionModel>(_boxName);
 
   /// Бардыгын карап чык
   List<OmegaTransactionModel> getAll() => _box.values.toList();
 
   /// Жаңысын кош
-  Future<int> addTransaction(OmegaTransactionModel tx) => _box.add(tx);
+  Future<void> addTransaction(OmegaTransactionModel tx) => _box.put(tx.id, tx); // Используем id как ключ
 
   /// Жаңыртуу
-  Future<void> updateTransaction(int key, OmegaTransactionModel tx) =>
-      _box.put(key, tx);
+  Future<void> updateTransaction(String id, OmegaTransactionModel tx) =>
+      _box.put(id, tx); // Обновляем по id
 
   /// Өчүрүү
-  Future<void> deleteTransaction(int key) => _box.delete(key);
+  Future<void> deleteTransaction(String id) => _box.delete(id); // Удаляем по id
 
   /// Бардыгын өчүрүү
   Future<void> clearAll() => _box.clear();

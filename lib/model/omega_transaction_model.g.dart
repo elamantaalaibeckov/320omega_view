@@ -18,27 +18,33 @@ class OmegaTransactionModelAdapter extends TypeAdapter<OmegaTransactionModel> {
     };
     return OmegaTransactionModel(
       id: fields[0] as String,
-      amount: fields[1] as double,
-      category: fields[2] as String,
-      date: fields[3] as DateTime,
-      note: fields[4] as String,
+      shootId: fields[1] as String,
+      amount: fields[2] as double,
+      category: fields[3] as String,
+      date: fields[4] as DateTime,
+      note: fields[5] as String?,
+      description: fields[6] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, OmegaTransactionModel obj) {
     writer
-      ..writeByte(5)
+      ..writeByte(7)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
-      ..write(obj.amount)
+      ..write(obj.shootId)
       ..writeByte(2)
-      ..write(obj.category)
+      ..write(obj.amount)
       ..writeByte(3)
-      ..write(obj.date)
+      ..write(obj.category)
       ..writeByte(4)
-      ..write(obj.note);
+      ..write(obj.date)
+      ..writeByte(5)
+      ..write(obj.note)
+      ..writeByte(6)
+      ..write(obj.description);
   }
 
   @override

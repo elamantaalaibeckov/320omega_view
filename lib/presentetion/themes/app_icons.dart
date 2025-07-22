@@ -6,4 +6,7 @@ class AppIcons {
   static const deleteshoot = 'assets/icons/deleteshoot.png';
   static const notficationIcon = 'assets/icons/notfication_icon.png';
   static const transacktionImage = 'assets/icons/transacktion_image.png';
+  static const plusIcon = 'assets/icons/plus.png';
+  static const expencesRed = 'assets/icons/expences_red.png';
+  static const incomeGreen = 'assets/icons/income_green.png';
 }

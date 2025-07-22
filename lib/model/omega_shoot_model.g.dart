@@ -10,27 +10,17 @@ class OmegaShootModelAdapter extends TypeAdapter<OmegaShootModel> {
   @override
   final int typeId = 0;
 
-  // ----------  ДОБАВЬ ЭТО ----------
-  /// Принимает либо DateTime, либо строку в ISO‑формате.
-  DateTime _toDateTime(dynamic v) {
-    if (v is DateTime) return v;
-    if (v is String) return DateTime.parse(v);
-    throw ArgumentError('Unsupported date value: $v');
-  }
-  // ---------------------------------
-
   @override
   OmegaShootModel read(BinaryReader reader) {
     final numOfFields = reader.readByte();
     final fields = <int, dynamic>{
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
-
     return OmegaShootModel(
       id: fields[0] as String,
       clientName: fields[1] as String,
-      date: _toDateTime(fields[2]), // <‑‑ используем парсер
-      time: _toDateTime(fields[3]), // <‑‑
+      date: fields[2] as DateTime,
+      time: fields[3] as DateTime,
       address: fields[4] as String,
       comments: fields[5] as String?,
       isPlanned: fields[6] as bool,

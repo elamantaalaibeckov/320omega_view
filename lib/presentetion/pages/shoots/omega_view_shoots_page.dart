@@ -7,6 +7,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:omega_view_smart_plan_320/cubit/shoots/shoots_cubit.dart';
 import 'package:omega_view_smart_plan_320/cubit/shoots/shoots_state.dart';
 import 'package:omega_view_smart_plan_320/model/omega_shoot_model.dart';
+import 'package:omega_view_smart_plan_320/presentetion/pages/shoots/screens/omega_shoot_details_page.dart';
 import 'package:omega_view_smart_plan_320/presentetion/pages/shoots/screens/planned_add_shoot.dart';
 import 'package:omega_view_smart_plan_320/presentetion/themes/app_colors.dart';
 import 'package:omega_view_smart_plan_320/presentetion/themes/app_icons.dart';
@@ -14,7 +15,7 @@ import 'package:omega_view_smart_plan_320/presentetion/themes/app_images.dart';
 import 'package:intl/intl.dart'; // Import for date formatting
 
 class OmegaViewShootsPage extends StatefulWidget {
-  const OmegaViewShootsPage({Key? key}) : super(key: key);
+  const OmegaViewShootsPage({super.key});
 
   @override
   State<OmegaViewShootsPage> createState() => _OmegaViewShootsPageState();
@@ -191,157 +192,155 @@ class _OmegaViewShootsPageState extends State<OmegaViewShootsPage>
   }
 
   Widget _buildShootCard(OmegaShootModel shoot, bool isPlannedTab) {
-    return Container(
-      margin: EdgeInsets.only(bottom: 16.h),
-      padding: EdgeInsets.all(15.w),
-      decoration: BoxDecoration(
-        color: AppColors.bottomNavigatorAppBarColor,
-        borderRadius: BorderRadius.circular(16.r),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              // Основная дата-время
-              Text(
-                DateFormat('MMM dd, yyyy, HH:mm').format(
-                  DateTime(
-                    shoot.date.year,
-                    shoot.date.month,
-                    shoot.date.day,
-                    shoot.time.hour,
-                    shoot.time.minute,
-                  ),
-                ),
-                style: TextStyle(
-                  color: AppColors.textWhite,
-                  fontSize: 17.sp,
-                  fontWeight: FontWeight.w500,
-                  height: 1.29,
-                  letterSpacing: -0.43,
-                ),
-              ),
-
-              SizedBox(width: 4.w),
-
-              // Всегда показываем "AM"
-              Text(
-                'AM',
-                style: TextStyle(
-                  color: AppColors.textWhite,
-                  fontSize: 17.sp,
-                  fontWeight: FontWeight.w500,
-                  height: 1.29,
-                  letterSpacing: -0.43,
-                ),
-              ),
-
-              Spacer(),
-
-              // Иконка для Completed
-              if (!isPlannedTab)
-                Padding(
-                  padding: EdgeInsets.only(right: 115),
-                  child: Container(
-                    width: 12.w,
-                    height: 12.h,
-                    alignment: Alignment.center,
-                    child: Image.asset(
-                      'assets/icons/first_icon.png',
-                      fit: BoxFit.contain,
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ShootDetailsPage(shoot: shoot),
+          ),
+        );
+      },
+      child: Container(
+        margin: EdgeInsets.only(bottom: 16.h),
+        padding: EdgeInsets.all(15.w),
+        decoration: BoxDecoration(
+          color: AppColors.bottomNavigatorAppBarColor,
+          borderRadius: BorderRadius.circular(16.r),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  DateFormat('MMM dd, yyyy, HH:mm').format(
+                    DateTime(
+                      shoot.date.year,
+                      shoot.date.month,
+                      shoot.date.day,
+                      shoot.time.hour,
+                      shoot.time.minute,
                     ),
                   ),
-                ),
-
-              // Иконка уведомлений для Planned
-              if (isPlannedTab && shoot.notificationsEnabled == true)
-                Image.asset(
-                  AppIcons.notficationIcon,
-                  width: 20.w,
-                  height: 21.h,
-                )
-            ],
-          ),
-          SizedBox(height: 8.h),
-          Text(
-            shoot.clientName,
-            style: TextStyle(
-              color: AppColors.textWhite,
-              fontSize: 15.sp,
-              fontFamily: 'SF PRo',
-              fontWeight: FontWeight.w400,
-              height: 1.33,
-              letterSpacing: -0.23,
-            ),
-          ),
-          SizedBox(height: 4.h),
-          Text(
-            shoot.address,
-            style: TextStyle(
-              color: AppColors.textWhite,
-              fontSize: 15.sp,
-              fontFamily: 'SF PRo',
-              fontWeight: FontWeight.w400,
-              height: 1.33,
-              letterSpacing: -0.23,
-            ),
-          ),
-          if (!isPlannedTab &&
-              shoot.finalShotsPaths != null &&
-              shoot.finalShotsPaths!.isNotEmpty)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(height: 12.h),
-                Text(
-                  'Your Photos',
                   style: TextStyle(
-                    color: AppColors.grey2,
-                    fontSize: 13.sp,
-                    fontFamily: 'SF PRO',
-                    fontWeight: FontWeight.w400,
-                    height: 1.38,
-                    letterSpacing: -0.08,
+                    color: AppColors.textWhite,
+                    fontSize: 17.sp,
+                    fontWeight: FontWeight.w500,
+                    height: 1.29,
+                    letterSpacing: -0.43,
                   ),
                 ),
-                SizedBox(height: 8.h),
-                _buildPhotoRow(shoot.finalShotsPaths!),
+                SizedBox(width: 4.w),
+                Text(
+                  'AM',
+                  style: TextStyle(
+                    color: AppColors.textWhite,
+                    fontSize: 17.sp,
+                    fontWeight: FontWeight.w500,
+                    height: 1.29,
+                    letterSpacing: -0.43,
+                  ),
+                ),
+                Spacer(),
+                if (!isPlannedTab)
+                  Padding(
+                    padding: EdgeInsets.only(right: 115),
+                    child: Container(
+                      width: 12.w,
+                      height: 12.h,
+                      alignment: Alignment.center,
+                      child: Image.asset(
+                        'assets/icons/first_icon.png',
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ),
+                if (isPlannedTab && shoot.notificationsEnabled == true)
+                  Image.asset(
+                    AppIcons.notficationIcon,
+                    width: 20.w,
+                    height: 21.h,
+                  )
               ],
             ),
-          if (shoot.shootReferencesPaths.isNotEmpty)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(height: 12.h),
-                if (!isPlannedTab)
+            SizedBox(height: 8.h),
+            Text(
+              shoot.clientName,
+              style: TextStyle(
+                color: AppColors.textWhite,
+                fontSize: 15.sp,
+                fontWeight: FontWeight.w400,
+                height: 1.33,
+                letterSpacing: -0.23,
+              ),
+            ),
+            SizedBox(height: 4.h),
+            Text(
+              shoot.address,
+              style: TextStyle(
+                color: AppColors.textWhite,
+                fontSize: 15.sp,
+                fontWeight: FontWeight.w400,
+                height: 1.33,
+                letterSpacing: -0.23,
+              ),
+            ),
+            if (!isPlannedTab &&
+                shoot.finalShotsPaths != null &&
+                shoot.finalShotsPaths!.isNotEmpty)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(height: 12.h),
                   Text(
-                    'Shoot References',
+                    'Your Photos',
+                    style: TextStyle(
+                      color: AppColors.grey2,
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w400,
+                      height: 1.38,
+                      letterSpacing: -0.08,
+                    ),
+                  ),
+                  SizedBox(height: 8.h),
+                  _buildPhotoRow(shoot.finalShotsPaths!),
+                ],
+              ),
+            if (shoot.shootReferencesPaths.isNotEmpty)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(height: 12.h),
+                  if (!isPlannedTab)
+                    Text(
+                      'Shoot References',
+                      style: TextStyle(
+                        color: AppColors.textWhite,
+                        fontSize: 13.sp,
+                      ),
+                    ),
+                  if (!isPlannedTab) SizedBox(height: 8.h),
+                  SizedBox(height: 8.h),
+                  _buildPhotoRow(shoot.shootReferencesPaths),
+                ],
+              ),
+            if (shoot.comments != null && shoot.comments!.isNotEmpty)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(height: 16.h),
+                  Text(
+                    shoot.comments!,
                     style: TextStyle(
                       color: AppColors.textWhite,
                       fontSize: 13.sp,
                     ),
                   ),
-                if (!isPlannedTab) SizedBox(height: 8.h),
-                SizedBox(height: 8.h),
-                _buildPhotoRow(shoot.shootReferencesPaths),
-              ],
-            ),
-          if (shoot.comments != null && shoot.comments!.isNotEmpty)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(height: 16.h),
-                Text(
-                  shoot.comments!,
-                  style: TextStyle(
-                    color: AppColors.textWhite,
-                    fontSize: 13.sp,
-                  ),
-                ),
-              ],
-            ),
-        ],
+                ],
+              ),
+          ],
+        ),
       ),
     );
   }
