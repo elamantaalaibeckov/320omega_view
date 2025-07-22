@@ -442,7 +442,7 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
           width: double.infinity,
           height: 108.h,
           decoration: BoxDecoration(
-            color: AppColors.bottomNavigatorAppBarColor,
+            color: AppColors.filedGrey,
             borderRadius: BorderRadius.circular(16.r),
           ),
           padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
@@ -452,11 +452,14 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Notification',
-                      style: TextStyle(
-                          color: AppColors.textgrey,
-                          fontSize: 14.sp,
-                          fontWeight: FontWeight.w500)),
+                  Text(
+                    'Notification',
+                    style: TextStyle(
+                      color: _notify ? AppColors.textWhite : AppColors.textgrey,
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                   CupertinoSwitch(
                     activeColor: AppColors.mainAccent,
                     value: _notify,
@@ -482,12 +485,8 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
           height: 52.h,
           child: ElevatedButton(
             style: style,
-            onPressed:
-                plannedEnabled ? _saveShoot : null, // Используем _saveShoot
-            child: Text(
-                widget.editShoot == null
-                    ? 'Add'
-                    : 'Save', // Изменили текст кнопки
+            onPressed: plannedEnabled ? _saveShoot : null,
+            child: Text(widget.editShoot == null ? 'Add' : 'Save',
                 style: TextStyle(
                   color: AppColors.textWhite,
                   fontSize: 16.sp,
@@ -507,13 +506,15 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
         _finalShots.isNotEmpty;
 
     final ButtonStyle style = ButtonStyle(
-      backgroundColor: MaterialStateProperty.resolveWith((states) {
-        return states.contains(MaterialState.disabled)
+      backgroundColor: WidgetStateProperty.resolveWith((states) {
+        return states.contains(WidgetState.disabled)
             ? AppColors.textgrey
             : AppColors.mainAccent;
       }),
-      shape: MaterialStateProperty.all(
-        RoundedRectangleBorder(borderRadius: BorderRadius.circular(30.r)),
+      shape: WidgetStateProperty.all(
+        RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16.r),
+        ),
       ),
     );
 
@@ -588,12 +589,8 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
           height: 52.h,
           child: ElevatedButton(
             style: style,
-            onPressed:
-                completedEnabled ? _saveShoot : null, // Используем _saveShoot
-            child: Text(
-                widget.editShoot == null
-                    ? 'Add'
-                    : 'Save', // Изменили текст кнопки
+            onPressed: completedEnabled ? _saveShoot : null,
+            child: Text(widget.editShoot == null ? 'Add' : 'Save',
                 style: TextStyle(
                   color: AppColors.textWhite,
                   fontSize: 16.sp,
@@ -611,9 +608,7 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
     required VoidCallback onAdd,
     required void Function(int) onRemove,
   }) {
-    // флаг, что есть место для добавления
     final hasAdd = list.length < _maxPhotos;
-    // если можем добавить – вместимость = текущие + 1, иначе = текущие
     final total = hasAdd ? list.length + 1 : list.length;
 
     return Column(
@@ -632,13 +627,12 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
             childAspectRatio: 1,
           ),
           itemBuilder: (context, i) {
-            // первая ячейка — Add
             if (hasAdd && i == 0) {
               return GestureDetector(
                 onTap: onAdd,
                 child: Container(
                   decoration: BoxDecoration(
-                    color: AppColors.bottomNavigatorAppBarColor,
+                    color: AppColors.filedGrey,
                     borderRadius: BorderRadius.circular(8.r),
                   ),
                   child: Center(
@@ -652,7 +646,6 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
               );
             }
 
-            // для фотографий вычисляем реальный индекс:
             final photoIdx = hasAdd ? i - 1 : i;
             if (photoIdx < list.length) {
               return Stack(
@@ -676,7 +669,7 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
                         width: 36.w,
                         height: 36.h,
                         decoration: BoxDecoration(
-                          color: AppColors.bottomNavigatorAppBarColor,
+                          color: AppColors.filedGrey,
                           borderRadius: BorderRadius.circular(8.r),
                         ),
                         child: Center(

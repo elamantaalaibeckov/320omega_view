@@ -65,6 +65,24 @@ class _AddTransactionPageState extends State<AddTransactionPage>
 
   bool get _isEditing => widget.initialTx != null;
 
+  // Новое свойство для определения, можно ли сохранить транзакцию
+  bool get _canSaveTransaction {
+    if (_selectedShoot == null) return false;
+
+    if (_tabIndex == 0) {
+      // Income tab
+      return (_incomeAmountController.text.isNotEmpty &&
+          (double.tryParse(_incomeAmountController.text) ?? 0) > 0);
+    } else {
+      // Expenses tab
+      if (_expenseItems.isEmpty) return false;
+      // Проверяем, что хотя бы один элемент расхода заполнен полностью
+      return _expenseItems.any((item) =>
+          item.nameController.text.trim().isNotEmpty &&
+          (double.tryParse(item.priceController.text) ?? 0) > 0);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -81,9 +99,11 @@ class _AddTransactionPageState extends State<AddTransactionPage>
         _expenseItems.add(
           ExpenseItem(
             id: _uuid.v4(),
-            nameController: TextEditingController(text: tx.note),
+            nameController: TextEditingController(text: tx.note)
+              ..addListener(_updateSaveButton), // Добавляем слушатель
             priceController:
-                TextEditingController(text: tx.amount.toStringAsFixed(0)),
+                TextEditingController(text: tx.amount.toStringAsFixed(0))
+                  ..addListener(_updateSaveButton), // Добавляем слушатель
           ),
         );
       }
@@ -92,8 +112,10 @@ class _AddTransactionPageState extends State<AddTransactionPage>
       _expenseItems.add(
         ExpenseItem(
           id: _uuid.v4(),
-          nameController: TextEditingController(),
-          priceController: TextEditingController(),
+          nameController: TextEditingController()
+            ..addListener(_updateSaveButton), // Добавляем слушатель
+          priceController: TextEditingController()
+            ..addListener(_updateSaveButton), // Добавляем слушатель
         ),
       );
     }
@@ -101,6 +123,10 @@ class _AddTransactionPageState extends State<AddTransactionPage>
     // слушатели для dirty‑флага
     _incomeAmountController.addListener(_markDirty);
     _commentsController.addListener(_markDirty);
+    _incomeAmountController
+        .addListener(_updateSaveButton); // Добавляем слушатель для Income
+    _commentsController
+        .addListener(_updateSaveButton); // Добавляем слушатель для Comments
 
     _tabController = TabController(length: 2, vsync: this)
       ..addListener(_handleTabSelection);
@@ -110,6 +136,14 @@ class _AddTransactionPageState extends State<AddTransactionPage>
 
   void _markDirty([_]) {
     if (!_isDirty) setState(() => _isDirty = true);
+  }
+
+  // Новый метод для обновления состояния кнопки "Add/Save"
+  void _updateSaveButton() {
+    setState(() {
+      // Это пустой setState, но он заставит виджет перестроиться
+      // и пересчитать значение _canSaveTransaction
+    });
   }
 
   void _handleTabSelection() {
@@ -123,6 +157,7 @@ class _AddTransactionPageState extends State<AddTransactionPage>
       _expenseItems.clear();
       if (_tabIndex == 1) _addExpenseItem();
       _isDirty = true;
+      _updateSaveButton(); // Обновляем состояние кнопки при смене вкладки
     });
   }
 
@@ -130,7 +165,10 @@ class _AddTransactionPageState extends State<AddTransactionPage>
   void dispose() {
     _tabController.removeListener(_handleTabSelection);
     _tabController.dispose();
+    _incomeAmountController
+        .removeListener(_updateSaveButton); // Удаляем слушатель
     _incomeAmountController.dispose();
+    _commentsController.removeListener(_updateSaveButton); // Удаляем слушатель
     _commentsController.dispose();
     _disposeExpenseItems();
     super.dispose();
@@ -157,11 +195,16 @@ class _AddTransactionPageState extends State<AddTransactionPage>
       _expenseItems.add(
         ExpenseItem(
           id: _uuid.v4(),
-          nameController: TextEditingController()..addListener(_markDirty),
-          priceController: TextEditingController()..addListener(_markDirty),
+          nameController: TextEditingController()
+            ..addListener(_markDirty)
+            ..addListener(_updateSaveButton),
+          priceController: TextEditingController()
+            ..addListener(_markDirty)
+            ..addListener(_updateSaveButton),
         ),
       );
       _isDirty = true;
+      _updateSaveButton(); // Обновляем состояние кнопки
     });
   }
 
@@ -169,10 +212,17 @@ class _AddTransactionPageState extends State<AddTransactionPage>
     setState(() {
       final idx = _expenseItems.indexWhere((e) => e.id == id);
       if (idx != -1) {
+        _expenseItems[idx]
+            .nameController
+            .removeListener(_updateSaveButton); // Удаляем слушатель
+        _expenseItems[idx]
+            .priceController
+            .removeListener(_updateSaveButton); // Удаляем слушатель
         _expenseItems[idx].dispose();
         _expenseItems.removeAt(idx);
         if (_expenseItems.isEmpty) _addExpenseItem();
         _isDirty = true;
+        _updateSaveButton(); // Обновляем состояние кнопки
       }
     });
   }
@@ -185,8 +235,8 @@ class _AddTransactionPageState extends State<AddTransactionPage>
   }
 
   Future<void> _saveTransaction() async {
-    if (_selectedShoot == null) {
-      _showSnackBar('Пожалуйста, выберите съёмку.', Colors.red);
+    if (!_canSaveTransaction) {
+      _showSnackBar('Пожалуйста, заполните все необходимые поля.', Colors.red);
       return;
     }
 
@@ -200,10 +250,6 @@ class _AddTransactionPageState extends State<AddTransactionPage>
     if (_tabIndex == 0) {
       // Income
       final amount = double.tryParse(_incomeAmountController.text) ?? 0;
-      if (amount <= 0) {
-        _showSnackBar('Введите корректную сумму дохода.', Colors.red);
-        return;
-      }
       final tx = OmegaTransactionModel(
         id: _uuid.v4(),
         shootId: _selectedShoot!.id,
@@ -219,7 +265,7 @@ class _AddTransactionPageState extends State<AddTransactionPage>
       for (var item in _expenseItems) {
         final name = item.nameController.text.trim();
         final price = double.tryParse(item.priceController.text) ?? 0;
-        if (name.isEmpty || price <= 0) continue;
+        if (name.isEmpty || price <= 0) continue; // Пропускаем незаполненные
         final tx = OmegaTransactionModel(
           id: _uuid.v4(),
           shootId: _selectedShoot!.id,
@@ -379,18 +425,26 @@ class _AddTransactionPageState extends State<AddTransactionPage>
               child: SizedBox(
                 height: 52.h,
                 child: ElevatedButton(
-                  onPressed: _saveTransaction,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: accent,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30.r)),
+                  onPressed: _canSaveTransaction ? _saveTransaction : null,
+                  style: ButtonStyle(
+                    backgroundColor:
+                        WidgetStateProperty.resolveWith<Color>((states) {
+                      return states.contains(WidgetState.disabled)
+                          ? AppColors.grey2 // серый, когда нельзя
+                          : AppColors.mainAccent; // синий, когда можно
+                    }),
+                    foregroundColor: WidgetStateProperty.all(Colors.white),
+                    shape: WidgetStateProperty.all(
+                      RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30.r)),
+                    ),
                   ),
                   child: Text(
                     _isEditing ? 'Save' : 'Add',
                     style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16.sp,
-                        fontWeight: FontWeight.w600),
+                      fontSize: 16.sp,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
@@ -440,6 +494,7 @@ class _AddTransactionPageState extends State<AddTransactionPage>
           hintText: 'Add Income',
           controller: _incomeAmountController,
           isNumberOnly: true,
+          onChanged: (_) => _updateSaveButton(), // Добавляем слушатель
         ),
         SizedBox(height: 16.h),
         AppTexts(texTs: 'Select Shoot'),
@@ -452,6 +507,7 @@ class _AddTransactionPageState extends State<AddTransactionPage>
         AppTextField(
           hintText: 'Add Comments',
           controller: _commentsController,
+          onChanged: (_) => _updateSaveButton(), // Добавляем слушатель
         ),
         SizedBox(height: 24.h),
       ],
@@ -498,6 +554,7 @@ class _AddTransactionPageState extends State<AddTransactionPage>
                     onTap: () => setState(() {
                       _selectedShoot = shoot;
                       _isShootPickerOpen = false;
+                      _updateSaveButton(); // Обновляем состояние кнопки при выборе съемки
                     }),
                     borderRadius: BorderRadius.circular(16.r),
                     child: Container(
@@ -616,14 +673,18 @@ class _AddTransactionPageState extends State<AddTransactionPage>
                     AppTextField(
                       hintText: 'Add name',
                       controller: e.nameController,
-                      onChanged: (_) => setState(() {}),
+                      fillColor: AppColors.cardGrey,
+                      onChanged: (_) =>
+                          _updateSaveButton(), // Добавляем слушатель
                     ),
                     SizedBox(height: 12.h),
                     AppTextField(
                       hintText: 'Add Price',
                       controller: e.priceController,
+                      fillColor: AppColors.cardGrey,
                       isNumberOnly: true,
-                      onChanged: (_) => setState(() {}),
+                      onChanged: (_) =>
+                          _updateSaveButton(), // Добавляем слушатель
                     ),
                     if (idx > 0)
                       Padding(
@@ -665,9 +726,9 @@ class _AddTransactionPageState extends State<AddTransactionPage>
           child: ElevatedButton(
             onPressed: _addExpenseItem,
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.mainAccent,
+              backgroundColor: AppColors.addexpense,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(30.r)),
+                  borderRadius: BorderRadius.circular(16.r)),
             ),
             child: Text('Add Expense',
                 style: TextStyle(
@@ -700,6 +761,7 @@ class _AddTransactionPageState extends State<AddTransactionPage>
         AppTextField(
           hintText: 'Add Comments',
           controller: _commentsController,
+          onChanged: (_) => _updateSaveButton(), // Добавляем слушатель
         ),
         SizedBox(height: 24.h),
       ],
@@ -708,7 +770,10 @@ class _AddTransactionPageState extends State<AddTransactionPage>
 
   Widget _buildShootPickerButton() {
     return GestureDetector(
-      onTap: () => setState(() => _isShootPickerOpen = !_isShootPickerOpen),
+      onTap: () => setState(() {
+        _isShootPickerOpen = !_isShootPickerOpen;
+        _updateSaveButton(); // Обновляем состояние кнопки при открытии/закрытии пикера
+      }),
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 14.h),
         decoration: BoxDecoration(
@@ -740,8 +805,6 @@ class _AddTransactionPageState extends State<AddTransactionPage>
                       width: 40.w,
                       height: 40.h,
                       color: AppColors.textgrey.withOpacity(0.2),
-                      child: Icon(Icons.broken_image,
-                          color: AppColors.textgrey, size: 24.r),
                     ),
                   ),
                 ),
@@ -795,6 +858,7 @@ class _AddTransactionPageState extends State<AddTransactionPage>
               onTap: () => setState(() {
                 _selectedShoot = shoot;
                 _isShootPickerOpen = false;
+                _updateSaveButton(); // Обновляем состояние кнопки при выборе съемки
               }),
               borderRadius: BorderRadius.circular(16.r),
               child: Container(

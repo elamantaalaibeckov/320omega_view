@@ -9,4 +9,5 @@ class AppColors {
   static const grey2 = Color(0xFF7A7A7A);
   static const cardGrey = Color(0xFF313131);
   static const filedGrey = Color(0xFF414141);
+  static const addexpense = Color(0x66336FEF);
 }

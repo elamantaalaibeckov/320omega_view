@@ -9,36 +9,40 @@ import 'package:omega_view_smart_plan_320/presentetion/themes/app_colors.dart';
 typedef DateTimeChanged = void Function(DateTime);
 
 class CupertinoDateTimeField extends StatefulWidget {
-  /// Текст метки над полем
+  /// Текст метки над полем (если нужен снаружи — можно не использовать)
   final String labelText;
 
-  /// Начальное значение (для date — дата, для time — время в DateTime)
+  /// Начальное значение
   final DateTime initialDateTime;
 
   /// Режим пикера: date или time
   final CupertinoDatePickerMode mode;
 
-  /// Коллбэк, возвращающий выбранное DateTime
+  /// Коллбэк выбора
   final DateTimeChanged onDateTimeChanged;
 
-  /// Форматтер (опционально). Если не указан, для date — yyyy-MM-dd, для time — HH:mm
+  /// Формат отображения
   final DateFormat? formatter;
 
-  /// Для time-пикера: 24‑часовой режим
+  /// 24‑часовой формат для time
   final bool use24hFormat;
 
-  // Жаңы касиет: дата/убакыт тандалганбы же жокпу көрсөтүү үчүн
+  /// Было ли выбрано значение (для цвета текста)
   final bool isPicked;
+
+  /// Цвет фона (по умолчанию filedGrey — то, что ты просил)
+  final Color bgColor;
 
   const CupertinoDateTimeField({
     Key? key,
-    this.labelText = '', // Демейки мааниси бош сап
+    this.labelText = '',
     required this.initialDateTime,
     required this.mode,
     required this.onDateTimeChanged,
     this.formatter,
     this.use24hFormat = false,
-    this.isPicked = false, // Демейки мааниси false
+    this.isPicked = false,
+    this.bgColor = AppColors.filedGrey,
   }) : super(key: key);
 
   @override
@@ -46,8 +50,7 @@ class CupertinoDateTimeField extends StatefulWidget {
 }
 
 class _CupertinoDateTimeFieldState extends State<CupertinoDateTimeField> {
-  late DateTime _currentDateTime; // Тандалган дата/убакытты сактоо үчүн
-  // _controller'ди мындан ары колдонуунун кереги жок, анткени биз текстти динамикалык түрдө көрсөтөбүз.
+  late DateTime _currentDateTime;
 
   @override
   void initState() {
@@ -55,7 +58,6 @@ class _CupertinoDateTimeFieldState extends State<CupertinoDateTimeField> {
     _currentDateTime = widget.initialDateTime;
   }
 
-  // initialDateTime өзгөргөндө _currentDateTime'ди жаңыртуу
   @override
   void didUpdateWidget(covariant CupertinoDateTimeField oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -65,24 +67,19 @@ class _CupertinoDateTimeFieldState extends State<CupertinoDateTimeField> {
   }
 
   String _getDisplayText() {
-    if (!widget.isPicked) {
-      return 'Select'; // Эгер тандалбаса "Select" көрсөтүү
-    }
+    if (!widget.isPicked) return 'Select';
 
     if (widget.formatter != null) {
       return widget.formatter!.format(_currentDateTime);
     } else if (widget.mode == CupertinoDatePickerMode.date) {
-      return DateFormat('MMM dd, yyyy')
-          .format(_currentDateTime); // Демейки дата форматы
+      return DateFormat('MMM dd, yyyy').format(_currentDateTime);
     } else {
-      return DateFormat('HH:mm')
-          .format(_currentDateTime); // Демейки убакыт форматы
+      return DateFormat('HH:mm').format(_currentDateTime);
     }
   }
 
   void _showPicker() {
-    DateTime picked =
-        _currentDateTime; // Учурдагы маанини баштапкы маани катары колдонуу
+    DateTime picked = _currentDateTime;
     showCupertinoModalPopup(
       context: context,
       builder: (_) => Container(
@@ -90,7 +87,7 @@ class _CupertinoDateTimeFieldState extends State<CupertinoDateTimeField> {
         color: Colors.white,
         child: Column(
           children: [
-            // — Панель Cancel / Done —
+            // Верхняя панель
             SizedBox(
               height: 50,
               child: Row(
@@ -122,7 +119,7 @@ class _CupertinoDateTimeFieldState extends State<CupertinoDateTimeField> {
                     ),
                     onPressed: () {
                       setState(() {
-                        _currentDateTime = picked; // Тандалган маанини жаңыртуу
+                        _currentDateTime = picked;
                       });
                       widget.onDateTimeChanged(_currentDateTime);
                       Navigator.of(context).pop();
@@ -133,18 +130,17 @@ class _CupertinoDateTimeFieldState extends State<CupertinoDateTimeField> {
             ),
             const Divider(
               height: 0.6,
-              thickness: 0.6, // толщина линии
-              color: AppColors.textgrey, // или любой другой цвет
+              thickness: 0.6,
+              color: AppColors.textgrey,
             ),
-
-            // — Сам пикер —
+            // Сам пикер
             Expanded(
               child: CupertinoDatePicker(
                 mode: widget.mode,
                 initialDateTime: picked,
                 onDateTimeChanged: (dt) => picked = dt,
                 use24hFormat: widget.use24hFormat,
-                backgroundColor: Colors.white, // Фонду ак кылуу
+                backgroundColor: Colors.white,
               ),
             ),
           ],
@@ -158,23 +154,21 @@ class _CupertinoDateTimeFieldState extends State<CupertinoDateTimeField> {
     return GestureDetector(
       onTap: _showPicker,
       child: Container(
-        height: 52.h, // настраиваем по дизайну
+        height: 52.h,
         padding: EdgeInsets.symmetric(horizontal: 16.w),
         decoration: BoxDecoration(
-          color: AppColors.bottomNavigatorAppBarColor, // фон как на фото
+          color: widget.bgColor, // ← filedGrey тут
           borderRadius: BorderRadius.circular(16.r),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              _getDisplayText(), // Текстти динамикалык түрдө алуу
+              _getDisplayText(),
               style: TextStyle(
-                color: widget.isPicked
-                    ? AppColors.textWhite
-                    : AppColors.textgrey, // Тандалганда ак, тандалбаганда боз
-                fontSize:
-                    16.sp, // 14.sp ордуна 16.sp, сүрөттөгүдөй чоңураак көрүнөт
+                color:
+                    widget.isPicked ? AppColors.textWhite : AppColors.textgrey,
+                fontSize: 16.sp,
                 fontFamily: 'SF PRO',
               ),
             ),
@@ -182,9 +176,7 @@ class _CupertinoDateTimeFieldState extends State<CupertinoDateTimeField> {
               widget.mode == CupertinoDatePickerMode.date
                   ? Icons.calendar_month
                   : Icons.access_time,
-              color: widget.isPicked
-                  ? AppColors.textWhite
-                  : AppColors.textgrey, // Тандалганда ак, тандалбаганда боз
+              color: widget.isPicked ? AppColors.textWhite : AppColors.textgrey,
             ),
           ],
         ),

@@ -6,7 +6,6 @@ import 'package:omega_view_smart_plan_320/model/omega_shoot_model.dart';
 import 'package:omega_view_smart_plan_320/model/omega_transaction_model.dart';
 import 'package:omega_view_smart_plan_320/presentetion/pages/transaction/screens/add_income_expenses.dart';
 import 'package:omega_view_smart_plan_320/presentetion/themes/app_colors.dart';
-// Импорт экрана редактирования/добавления транзакции
 
 class TransactionCard extends StatelessWidget {
   final OmegaTransactionModel transaction;
@@ -25,7 +24,6 @@ class TransactionCard extends StatelessWidget {
     final sign = isIncome ? '+' : '-';
     final amountColor = AppColors.textWhite;
 
-    // Подготовка превью изображения
     File? preview;
     if (shoot.finalShotsPaths != null && shoot.finalShotsPaths!.isNotEmpty) {
       final f = File(shoot.finalShotsPaths!.first);
@@ -38,7 +36,6 @@ class TransactionCard extends StatelessWidget {
     return InkWell(
       borderRadius: BorderRadius.circular(16.r),
       onTap: () {
-        // Навигация в экран AddTransactionPage в режиме редактирования
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => AddTransactionPage(
@@ -57,7 +54,6 @@ class TransactionCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Сумма
             Text(
               '$sign${transaction.amount.toStringAsFixed(0)}\$',
               style: TextStyle(
@@ -77,7 +73,6 @@ class TransactionCard extends StatelessWidget {
               ),
             SizedBox(height: 8.h),
 
-            // Дата и съёмка + фото
             Container(
               decoration: BoxDecoration(
                 color: AppColors.filedGrey,
@@ -112,8 +107,6 @@ class TransactionCard extends StatelessWidget {
                       ],
                     ),
                   ),
-
-                  // Превью фото
                   if (preview != null)
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8.r),
@@ -127,8 +120,6 @@ class TransactionCard extends StatelessWidget {
                     )
                   else
                     _emptyPhoto(),
-
-                  // Счётчик доп. фото
                   if (photosCount > 1) ...[
                     SizedBox(width: 8.w),
                     Container(
