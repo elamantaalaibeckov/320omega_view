@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
@@ -68,13 +69,12 @@ class _AddTransactionPageState extends State<AddTransactionPage>
     if (_selectedShoot == null) return false;
 
     if (_tabIndex == 0) {
-      return (_incomeAmountController.text.isNotEmpty &&
-          (double.tryParse(_incomeAmountController.text) ?? 0) > 0);
+      return (_parseAmount(_incomeAmountController.text) > 0);
     } else {
       if (_expenseItems.isEmpty) return false;
       return _expenseItems.any((item) =>
           item.nameController.text.trim().isNotEmpty &&
-          (double.tryParse(item.priceController.text) ?? 0) > 0);
+          _parseAmount(item.priceController.text) > 0);
     }
   }
 
@@ -82,35 +82,40 @@ class _AddTransactionPageState extends State<AddTransactionPage>
   void initState() {
     super.initState();
 
+    // === $ PREFIX ===
+    _attachDollarFormatter(_incomeAmountController);
+
     // ----------- PREFILL -----------
     if (_isEditing) {
       final tx = widget.initialTx!;
       _selectedShoot = widget.initialShoot;
       if (tx.category == 'Income') {
         _tabIndex = 0;
-        _incomeAmountController.text = tx.amount.toStringAsFixed(0);
+        _incomeAmountController.text = _formatWithDollar(tx.amount);
         _commentsController.text = tx.note ?? '';
       } else {
         _tabIndex = 1;
+        final nameCtrl = TextEditingController(text: tx.note);
+        final priceCtrl =
+            TextEditingController(text: _formatWithDollar(tx.amount));
+        _attachDollarFormatter(priceCtrl);
         _expenseItems.add(
           ExpenseItem(
             id: _uuid.v4(),
-            nameController: TextEditingController(text: tx.note)
-              ..addListener(_updateSaveButton),
-            priceController:
-                TextEditingController(text: tx.amount.toStringAsFixed(0))
-                  ..addListener(_updateSaveButton),
+            nameController: nameCtrl..addListener(_updateSaveButton),
+            priceController: priceCtrl..addListener(_updateSaveButton),
           ),
         );
       }
     } else {
+      final nameCtrl = TextEditingController()..addListener(_updateSaveButton);
+      final priceCtrl = TextEditingController()..addListener(_updateSaveButton);
+      _attachDollarFormatter(priceCtrl);
       _expenseItems.add(
         ExpenseItem(
           id: _uuid.v4(),
-          nameController: TextEditingController()
-            ..addListener(_updateSaveButton),
-          priceController: TextEditingController()
-            ..addListener(_updateSaveButton),
+          nameController: nameCtrl,
+          priceController: priceCtrl,
         ),
       );
     }
@@ -120,15 +125,37 @@ class _AddTransactionPageState extends State<AddTransactionPage>
     _incomeAmountController.addListener(_updateSaveButton);
     _commentsController.addListener(_updateSaveButton);
 
-    // ----------- FIX: initialIndex -----------
     _tabController = TabController(
       length: 2,
       vsync: this,
-      initialIndex: _tabIndex, // стартуем с нужной вкладки (Income/Expenses)
+      initialIndex: _tabIndex,
     )..addListener(_handleTabSelection);
 
     context.read<ShootsCubit>().loadShoots();
   }
+
+  // === $ PREFIX helpers ===
+  void _attachDollarFormatter(TextEditingController c) {
+    c.addListener(() {
+      final raw = c.text;
+      if (raw.isEmpty) return;
+      if (raw.startsWith('\$')) return;
+      final onlyNums = raw.replaceAll(RegExp(r'[^\d.]'), '');
+      final formatted = '\$ $onlyNums';
+      c.value = TextEditingValue(
+        text: formatted,
+        selection: TextSelection.collapsed(offset: formatted.length),
+      );
+    });
+  }
+
+  String _formatWithDollar(num value) => '\$ ${value.toStringAsFixed(0)}';
+
+  double _parseAmount(String text) {
+    final cleaned = text.replaceAll(RegExp(r'[^\d.]'), '');
+    return double.tryParse(cleaned) ?? 0;
+  }
+  // === end $ helpers ===
 
   void _markDirty([_]) {
     if (!_isDirty) setState(() => _isDirty = true);
@@ -137,24 +164,18 @@ class _AddTransactionPageState extends State<AddTransactionPage>
   void _updateSaveButton() => setState(() {});
 
   void _handleTabSelection() {
-    // если индекс реально не поменялся — выходим
     if (_tabController.index == _tabIndex) return;
 
     setState(() {
       _tabIndex = _tabController.index;
-      _isShootPickerOpen = false; // просто закрыли список
-      // НИЧЕГО НЕ ЧИСТИМ
+      _isShootPickerOpen = false;
 
-      // Если впервые зашли в Expenses и список пуст — создаём один элемент
       if (_tabIndex == 1 && _expenseItems.isEmpty) {
+        final nc = TextEditingController()..addListener(_updateSaveButton);
+        final pc = TextEditingController()..addListener(_updateSaveButton);
+        _attachDollarFormatter(pc);
         _expenseItems.add(
-          ExpenseItem(
-            id: _uuid.v4(),
-            nameController: TextEditingController()
-              ..addListener(_updateSaveButton),
-            priceController: TextEditingController()
-              ..addListener(_updateSaveButton),
-          ),
+          ExpenseItem(id: _uuid.v4(), nameController: nc, priceController: pc),
         );
       }
     });
@@ -189,19 +210,22 @@ class _AddTransactionPageState extends State<AddTransactionPage>
       }
     }
     setState(() {
+      final nameC = TextEditingController()
+        ..addListener(_markDirty)
+        ..addListener(_updateSaveButton);
+      final priceC = TextEditingController()
+        ..addListener(_markDirty)
+        ..addListener(_updateSaveButton);
+      _attachDollarFormatter(priceC);
+
       _expenseItems.add(
         ExpenseItem(
           id: _uuid.v4(),
-          nameController: TextEditingController()
-            ..addListener(_markDirty)
-            ..addListener(_updateSaveButton),
-          priceController: TextEditingController()
-            ..addListener(_markDirty)
-            ..addListener(_updateSaveButton),
+          nameController: nameC,
+          priceController: priceC,
         ),
       );
       _isDirty = true;
-      _updateSaveButton();
     });
   }
 
@@ -209,22 +233,24 @@ class _AddTransactionPageState extends State<AddTransactionPage>
     setState(() {
       final idx = _expenseItems.indexWhere((e) => e.id == id);
       if (idx != -1) {
-        _expenseItems[idx].nameController.removeListener(_updateSaveButton);
-        _expenseItems[idx].priceController.removeListener(_updateSaveButton);
         _expenseItems[idx].dispose();
         _expenseItems.removeAt(idx);
         if (_expenseItems.isEmpty) _addExpenseItem();
         _isDirty = true;
-        _updateSaveButton();
       }
     });
   }
 
   double _calculateTotalExpenses() {
     return _expenseItems.fold(0.0, (sum, item) {
-      final p = double.tryParse(item.priceController.text) ?? 0;
-      return sum + p;
+      return sum + _parseAmount(item.priceController.text);
     });
+  }
+
+  bool _isExpenseFilled(ExpenseItem item) {
+    final name = item.nameController.text.trim();
+    final price = _parseAmount(item.priceController.text);
+    return name.isNotEmpty && price > 0;
   }
 
   Future<void> _saveTransaction() async {
@@ -240,7 +266,7 @@ class _AddTransactionPageState extends State<AddTransactionPage>
     }
 
     if (_tabIndex == 0) {
-      final amount = double.tryParse(_incomeAmountController.text) ?? 0;
+      final amount = _parseAmount(_incomeAmountController.text);
       final tx = OmegaTransactionModel(
         id: _uuid.v4(),
         shootId: _selectedShoot!.id,
@@ -254,7 +280,7 @@ class _AddTransactionPageState extends State<AddTransactionPage>
     } else {
       for (var item in _expenseItems) {
         final name = item.nameController.text.trim();
-        final price = double.tryParse(item.priceController.text) ?? 0;
+        final price = _parseAmount(item.priceController.text);
         if (name.isEmpty || price <= 0) continue;
         final tx = OmegaTransactionModel(
           id: _uuid.v4(),
@@ -384,10 +410,10 @@ class _AddTransactionPageState extends State<AddTransactionPage>
                     padding:
                         EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
                     child: TabBar(
+                      dividerColor: AppColors.bgColor,
                       controller: _tabController,
                       indicator: BoxDecoration(
                         border: Border.all(color: accent, width: 1.5),
-                        borderRadius: BorderRadius.circular(16.r),
                       ),
                       indicatorSize: TabBarIndicatorSize.tab,
                       labelColor: AppColors.textWhite,
@@ -426,7 +452,7 @@ class _AddTransactionPageState extends State<AddTransactionPage>
                     foregroundColor: WidgetStateProperty.all(Colors.white),
                     shape: WidgetStateProperty.all(
                       RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(30.r)),
+                          borderRadius: BorderRadius.circular(16.r)),
                     ),
                   ),
                   child: Text(
@@ -649,13 +675,14 @@ class _AddTransactionPageState extends State<AddTransactionPage>
           itemCount: _expenseItems.length,
           itemBuilder: (context, idx) {
             final e = _expenseItems[idx];
+            final filled = _isExpenseFilled(e);
             return Padding(
               padding: EdgeInsets.only(bottom: 12.h),
               child: Container(
                 padding: EdgeInsets.all(16.w),
                 decoration: BoxDecoration(
                   color: AppColors.filedGrey,
-                  borderRadius: BorderRadius.circular(8.r),
+                  borderRadius: BorderRadius.circular(16.r),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -686,14 +713,17 @@ class _AddTransactionPageState extends State<AddTransactionPage>
                               width: 48.w,
                               height: 48.h,
                               decoration: BoxDecoration(
-                                color: AppColors.bottomNavigatorAppBarColor,
+                                color: AppColors.filedGrey,
                                 borderRadius: BorderRadius.circular(8.r),
                               ),
                               child: Center(
-                                child: Icon(
-                                  Icons.delete_outline,
-                                  color: AppColors.textgrey,
-                                  size: 24.r,
+                                child: Image.asset(
+                                  AppIcons.deleteshoot,
+                                  width: 18.w,
+                                  height: 22.h,
+                                  color: filled
+                                      ? AppColors.textWhite
+                                      : AppColors.textWhite.withOpacity(0.5),
                                 ),
                               ),
                             ),
@@ -720,7 +750,7 @@ class _AddTransactionPageState extends State<AddTransactionPage>
             child: Text(
               'Add Expense',
               style: TextStyle(
-                  color: Colors.white,
+                  color: AppColors.textWhite,
                   fontSize: 16.sp,
                   fontWeight: FontWeight.w600),
             ),
