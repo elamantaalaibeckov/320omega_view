@@ -205,7 +205,7 @@ class _OmegaViewShootsPageState extends State<OmegaViewShootsPage>
         margin: EdgeInsets.only(bottom: 16.h),
         padding: EdgeInsets.all(15.w),
         decoration: BoxDecoration(
-          color: AppColors.bottomNavigatorAppBarColor,
+          color: AppColors.filedGrey,
           borderRadius: BorderRadius.circular(16.r),
         ),
         child: Column(
@@ -316,7 +316,7 @@ class _OmegaViewShootsPageState extends State<OmegaViewShootsPage>
                     Text(
                       'Shoot References',
                       style: TextStyle(
-                        color: AppColors.textWhite,
+                        color: AppColors.textWhite.withOpacity(0.7),
                         fontSize: 13.sp,
                       ),
                     ),
@@ -333,7 +333,7 @@ class _OmegaViewShootsPageState extends State<OmegaViewShootsPage>
                   Text(
                     shoot.comments!,
                     style: TextStyle(
-                      color: AppColors.textWhite,
+                      color: AppColors.textWhite.withOpacity(0.7),
                       fontSize: 13.sp,
                     ),
                   ),

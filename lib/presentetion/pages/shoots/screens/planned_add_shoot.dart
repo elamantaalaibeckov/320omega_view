@@ -414,7 +414,7 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
             : AppColors.mainAccent;
       }),
       shape: MaterialStateProperty.all(
-        RoundedRectangleBorder(borderRadius: BorderRadius.circular(30.r)),
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
       ),
     );
 
