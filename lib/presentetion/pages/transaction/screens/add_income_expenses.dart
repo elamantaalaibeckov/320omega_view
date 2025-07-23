@@ -16,7 +16,7 @@ import 'package:omega_view_smart_plan_320/presentetion/widgets/app_text.dart';
 import 'package:omega_view_smart_plan_320/presentetion/widgets/app_text_filed.dart';
 import 'package:uuid/uuid.dart';
 
-/// Для одного поля расхода
+/// Один элемент расхода
 class ExpenseItem {
   final String id;
   final TextEditingController nameController;
@@ -34,7 +34,6 @@ class ExpenseItem {
   }
 }
 
-/// Страница добавления/редактирования транзакции
 class AddTransactionPage extends StatefulWidget {
   final OmegaTransactionModel? initialTx;
   final OmegaShootModel? initialShoot;
@@ -55,26 +54,33 @@ class _AddTransactionPageState extends State<AddTransactionPage>
   bool _isDirty = false;
   int _tabIndex = 0;
 
-  OmegaShootModel? _selectedShoot;
-  final TextEditingController _incomeAmountController = TextEditingController();
-  final TextEditingController _commentsController = TextEditingController();
-  bool _isShootPickerOpen = false;
+  // ==== FIX: раздельные состояния для вкладок ====
+  OmegaShootModel? _incomeShoot;
+  OmegaShootModel? _expenseShoot;
 
+  final TextEditingController _incomeAmountCtrl = TextEditingController();
+  final TextEditingController _incomeCommentCtrl = TextEditingController();
+
+  final TextEditingController _expenseCommentCtrl = TextEditingController();
   final List<ExpenseItem> _expenseItems = [];
+
+  bool _isIncomeShootPickerOpen = false;
+  bool _isExpenseShootPickerOpen = false;
+  // ==============================================
+
   final Uuid _uuid = const Uuid();
 
   bool get _isEditing => widget.initialTx != null;
 
   bool get _canSaveTransaction {
-    if (_selectedShoot == null) return false;
-
     if (_tabIndex == 0) {
-      return (_parseAmount(_incomeAmountController.text) > 0);
+      return _incomeShoot != null && _parseAmount(_incomeAmountCtrl.text) > 0;
     } else {
+      if (_expenseShoot == null) return false;
       if (_expenseItems.isEmpty) return false;
-      return _expenseItems.any((item) =>
-          item.nameController.text.trim().isNotEmpty &&
-          _parseAmount(item.priceController.text) > 0);
+      return _expenseItems.any((e) =>
+          e.nameController.text.trim().isNotEmpty &&
+          _parseAmount(e.priceController.text) > 0);
     }
   }
 
@@ -82,64 +88,73 @@ class _AddTransactionPageState extends State<AddTransactionPage>
   void initState() {
     super.initState();
 
-    // === $ PREFIX ===
-    _attachDollarFormatter(_incomeAmountController);
+    _attachDollarFormatter(_incomeAmountCtrl);
 
-    // ----------- PREFILL -----------
     if (_isEditing) {
       final tx = widget.initialTx!;
-      _selectedShoot = widget.initialShoot;
       if (tx.category == 'Income') {
         _tabIndex = 0;
-        _incomeAmountController.text = _formatWithDollar(tx.amount);
-        _commentsController.text = tx.note ?? '';
+        _incomeShoot = widget.initialShoot;
+        _incomeAmountCtrl.text = _formatWithDollar(tx.amount);
+        _incomeCommentCtrl.text = tx.note ?? '';
+
+        _createEmptyExpenseItem();
       } else {
         _tabIndex = 1;
-        final nameCtrl = TextEditingController(text: tx.note);
+        _expenseShoot = widget.initialShoot;
+
+        final nameCtrl = TextEditingController(text: tx.note)
+          ..addListener(_updateSaveButton);
         final priceCtrl =
-            TextEditingController(text: _formatWithDollar(tx.amount));
+            TextEditingController(text: _formatWithDollar(tx.amount))
+              ..addListener(_updateSaveButton);
         _attachDollarFormatter(priceCtrl);
+
         _expenseItems.add(
           ExpenseItem(
             id: _uuid.v4(),
-            nameController: nameCtrl..addListener(_updateSaveButton),
-            priceController: priceCtrl..addListener(_updateSaveButton),
+            nameController: nameCtrl,
+            priceController: priceCtrl,
           ),
         );
+        _incomeAmountCtrl.clear();
+        _incomeCommentCtrl.clear();
       }
     } else {
-      final nameCtrl = TextEditingController()..addListener(_updateSaveButton);
-      final priceCtrl = TextEditingController()..addListener(_updateSaveButton);
-      _attachDollarFormatter(priceCtrl);
-      _expenseItems.add(
-        ExpenseItem(
-          id: _uuid.v4(),
-          nameController: nameCtrl,
-          priceController: priceCtrl,
-        ),
-      );
+      _createEmptyExpenseItem();
     }
 
-    _incomeAmountController.addListener(_markDirty);
-    _commentsController.addListener(_markDirty);
-    _incomeAmountController.addListener(_updateSaveButton);
-    _commentsController.addListener(_updateSaveButton);
+    [
+      _incomeAmountCtrl,
+      _incomeCommentCtrl,
+      _expenseCommentCtrl,
+      ..._expenseItems.map((e) => e.nameController),
+      ..._expenseItems.map((e) => e.priceController),
+    ].forEach((c) => c.addListener(_markDirty));
 
     _tabController = TabController(
       length: 2,
       vsync: this,
       initialIndex: _tabIndex,
-    )..addListener(_handleTabSelection);
+    )..addListener(_handleTabChange);
 
     context.read<ShootsCubit>().loadShoots();
   }
 
-  // === $ PREFIX helpers ===
+  void _createEmptyExpenseItem() {
+    if (_expenseItems.isNotEmpty) return;
+    final nc = TextEditingController()..addListener(_updateSaveButton);
+    final pc = TextEditingController()..addListener(_updateSaveButton);
+    _attachDollarFormatter(pc);
+    _expenseItems.add(
+      ExpenseItem(id: _uuid.v4(), nameController: nc, priceController: pc),
+    );
+  }
+
   void _attachDollarFormatter(TextEditingController c) {
     c.addListener(() {
       final raw = c.text;
-      if (raw.isEmpty) return;
-      if (raw.startsWith('\$')) return;
+      if (raw.isEmpty || raw.startsWith('\$')) return;
       final onlyNums = raw.replaceAll(RegExp(r'[^\d.]'), '');
       final formatted = '\$ $onlyNums';
       c.value = TextEditingValue(
@@ -149,52 +164,42 @@ class _AddTransactionPageState extends State<AddTransactionPage>
     });
   }
 
-  String _formatWithDollar(num value) => '\$ ${value.toStringAsFixed(0)}';
+  String _formatWithDollar(num v) => '\$ ${v.toStringAsFixed(0)}';
 
-  double _parseAmount(String text) {
-    final cleaned = text.replaceAll(RegExp(r'[^\d.]'), '');
+  double _parseAmount(String t) {
+    final cleaned = t.replaceAll(RegExp(r'[^\d.]'), '');
     return double.tryParse(cleaned) ?? 0;
   }
-  // === end $ helpers ===
 
-  void _markDirty([_]) {
+  void _markDirty() {
     if (!_isDirty) setState(() => _isDirty = true);
   }
 
   void _updateSaveButton() => setState(() {});
 
-  void _handleTabSelection() {
+  void _handleTabChange() {
     if (_tabController.index == _tabIndex) return;
-
     setState(() {
       _tabIndex = _tabController.index;
-      _isShootPickerOpen = false;
 
-      if (_tabIndex == 1 && _expenseItems.isEmpty) {
-        final nc = TextEditingController()..addListener(_updateSaveButton);
-        final pc = TextEditingController()..addListener(_updateSaveButton);
-        _attachDollarFormatter(pc);
-        _expenseItems.add(
-          ExpenseItem(id: _uuid.v4(), nameController: nc, priceController: pc),
-        );
-      }
+      _isIncomeShootPickerOpen = false;
+      _isExpenseShootPickerOpen = false;
     });
   }
 
   @override
   void dispose() {
-    _tabController.removeListener(_handleTabSelection);
+    _tabController.removeListener(_handleTabChange);
     _tabController.dispose();
-    _incomeAmountController.removeListener(_updateSaveButton);
-    _incomeAmountController.dispose();
-    _commentsController.removeListener(_updateSaveButton);
-    _commentsController.dispose();
-    _disposeExpenseItems();
-    super.dispose();
-  }
 
-  void _disposeExpenseItems() {
-    for (var item in _expenseItems) item.dispose();
+    _incomeAmountCtrl.dispose();
+    _incomeCommentCtrl.dispose();
+    _expenseCommentCtrl.dispose();
+
+    for (final e in _expenseItems) {
+      e.dispose();
+    }
+    super.dispose();
   }
 
   void _addExpenseItem() {
@@ -202,30 +207,20 @@ class _AddTransactionPageState extends State<AddTransactionPage>
       final last = _expenseItems.last;
       if (last.nameController.text.trim().isEmpty ||
           last.priceController.text.trim().isEmpty) {
-        _showSnackBar(
-          'Заполните все поля текущего расхода перед добавлением нового.',
-          Colors.red,
-        );
         return;
       }
     }
     setState(() {
-      final nameC = TextEditingController()
+      final nc = TextEditingController()
         ..addListener(_markDirty)
         ..addListener(_updateSaveButton);
-      final priceC = TextEditingController()
+      final pc = TextEditingController()
         ..addListener(_markDirty)
         ..addListener(_updateSaveButton);
-      _attachDollarFormatter(priceC);
-
+      _attachDollarFormatter(pc);
       _expenseItems.add(
-        ExpenseItem(
-          id: _uuid.v4(),
-          nameController: nameC,
-          priceController: priceC,
-        ),
+        ExpenseItem(id: _uuid.v4(), nameController: nc, priceController: pc),
       );
-      _isDirty = true;
     });
   }
 
@@ -235,56 +230,47 @@ class _AddTransactionPageState extends State<AddTransactionPage>
       if (idx != -1) {
         _expenseItems[idx].dispose();
         _expenseItems.removeAt(idx);
-        if (_expenseItems.isEmpty) _addExpenseItem();
-        _isDirty = true;
+        if (_expenseItems.isEmpty) _createEmptyExpenseItem();
       }
     });
   }
 
-  double _calculateTotalExpenses() {
-    return _expenseItems.fold(0.0, (sum, item) {
-      return sum + _parseAmount(item.priceController.text);
-    });
-  }
+  double _calculateTotalExpenses() => _expenseItems.fold(
+      0.0, (sum, e) => sum + _parseAmount(e.priceController.text));
 
-  bool _isExpenseFilled(ExpenseItem item) {
-    final name = item.nameController.text.trim();
-    final price = _parseAmount(item.priceController.text);
-    return name.isNotEmpty && price > 0;
-  }
+  bool _expenseRowFilled(ExpenseItem e) =>
+      e.nameController.text.trim().isNotEmpty &&
+      _parseAmount(e.priceController.text) > 0;
 
   Future<void> _saveTransaction() async {
     if (!_canSaveTransaction) {
-      _showSnackBar('Пожалуйста, заполните все необходимые поля.', Colors.red);
       return;
     }
 
     final cubit = context.read<TransactionsCubit>();
-
     if (_isEditing) {
       await cubit.deleteTransaction(widget.initialTx!.id);
     }
 
     if (_tabIndex == 0) {
-      final amount = _parseAmount(_incomeAmountController.text);
+      final amount = _parseAmount(_incomeAmountCtrl.text);
       final tx = OmegaTransactionModel(
         id: _uuid.v4(),
-        shootId: _selectedShoot!.id,
+        shootId: _incomeShoot!.id,
         amount: amount,
         category: 'Income',
         date: DateTime.now(),
-        note:
-            _commentsController.text.isEmpty ? null : _commentsController.text,
+        note: _incomeCommentCtrl.text.isEmpty ? null : _incomeCommentCtrl.text,
       );
       await cubit.addTransaction(tx);
     } else {
-      for (var item in _expenseItems) {
+      for (final item in _expenseItems) {
         final name = item.nameController.text.trim();
         final price = _parseAmount(item.priceController.text);
         if (name.isEmpty || price <= 0) continue;
         final tx = OmegaTransactionModel(
           id: _uuid.v4(),
-          shootId: _selectedShoot!.id,
+          shootId: _expenseShoot!.id,
           amount: price,
           category: 'Expense',
           date: DateTime.now(),
@@ -295,10 +281,6 @@ class _AddTransactionPageState extends State<AddTransactionPage>
     }
 
     Navigator.of(context).pop();
-    _showSnackBar(
-      _isEditing ? 'Транзакция обновлена!' : 'Транзакция успешно добавлена!',
-      AppColors.mainAccent,
-    );
   }
 
   Future<void> _confirmDelete() async {
@@ -312,11 +294,11 @@ class _AddTransactionPageState extends State<AddTransactionPage>
         ),
         actions: [
           CupertinoDialogAction(
-            child: Text('Cancel'),
+            child: const Text('Cancel'),
             onPressed: () => Navigator.of(context).pop(false),
           ),
           CupertinoDialogAction(
-            child: Text('Delete', style: TextStyle(color: Colors.red)),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
             onPressed: () => Navigator.of(context).pop(true),
           ),
         ],
@@ -327,7 +309,6 @@ class _AddTransactionPageState extends State<AddTransactionPage>
           .read<TransactionsCubit>()
           .deleteTransaction(widget.initialTx!.id);
       Navigator.of(context).pop();
-      _showSnackBar('Транзакция удалена', AppColors.mainAccent);
     }
   }
 
@@ -343,11 +324,12 @@ class _AddTransactionPageState extends State<AddTransactionPage>
         ),
         actions: [
           CupertinoDialogAction(
-            child: Text('Cancel'),
+            child: const Text('Cancel'),
             onPressed: () => Navigator.of(context).pop(false),
           ),
           CupertinoDialogAction(
-            child: Text('Leave', style: TextStyle(fontWeight: FontWeight.w600)),
+            child: const Text('Leave',
+                style: TextStyle(fontWeight: FontWeight.w600)),
             onPressed: () => Navigator.of(context).pop(true),
           ),
         ],
@@ -377,7 +359,6 @@ class _AddTransactionPageState extends State<AddTransactionPage>
         backgroundColor: AppColors.bgColor,
         appBar: AppBar(
           backgroundColor: AppColors.bottomNavigatorAppBarColor,
-          elevation: 0,
           leading: const BackButton(color: Colors.white),
           title: Text(
             _isEditing ? 'Edit Transaction' : 'Add Transaction',
@@ -396,7 +377,7 @@ class _AddTransactionPageState extends State<AddTransactionPage>
                   width: 24.w,
                   height: 24.h,
                 ),
-                onPressed: () => _confirmDelete(),
+                onPressed: _confirmDelete,
               ),
           ],
         ),
@@ -471,58 +452,50 @@ class _AddTransactionPageState extends State<AddTransactionPage>
     );
   }
 
-  Widget _buildSelectedShoot(OmegaShootModel shoot) {
-    final dt = DateTime(
-      shoot.date.year,
-      shoot.date.month,
-      shoot.date.day,
-      shoot.time.hour,
-      shoot.time.minute,
-    );
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          DateFormat('MMM d, yyyy, h:mm a').format(dt),
-          style: TextStyle(
-              color: Colors.white,
-              fontSize: 14.sp,
-              fontWeight: FontWeight.w500),
-        ),
-        SizedBox(height: 4.h),
-        Text(
-          '${shoot.clientName}, ${shoot.address}',
-          style: TextStyle(color: AppColors.textgrey, fontSize: 14.sp),
-        ),
-      ],
-    );
-  }
-
+  // ---------- Income UI ----------
   Widget _buildIncomeForm(List<OmegaShootModel> shoots) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(height: 16.h),
-        AppTexts(texTs: 'Income Amount'),
+        const AppTexts(texTs: 'Income Amount'),
         SizedBox(height: 8.h),
         AppTextField(
           hintText: 'Add Income',
-          controller: _incomeAmountController,
+          controller: _incomeAmountCtrl,
           isNumberOnly: true,
           onChanged: (_) => _updateSaveButton(),
         ),
         SizedBox(height: 16.h),
-        AppTexts(texTs: 'Select Shoot'),
+        const AppTexts(texTs: 'Select Shoot'),
         SizedBox(height: 8.h),
-        _buildShootPickerButton(),
-        if (_isShootPickerOpen) _buildShootList(shoots),
+        _buildShootPickerButton(
+          selected: _incomeShoot,
+          isOpen: _isIncomeShootPickerOpen,
+          onToggle: () => setState(
+              () => _isIncomeShootPickerOpen = !_isIncomeShootPickerOpen),
+          onSelect: (s) => setState(() {
+            _incomeShoot = s;
+            _isIncomeShootPickerOpen = false;
+            _updateSaveButton();
+          }),
+        ),
+        if (_isIncomeShootPickerOpen)
+          _buildShootList(
+            shoots: shoots,
+            selected: _incomeShoot,
+            onSelect: (s) => setState(() {
+              _incomeShoot = s;
+              _isIncomeShootPickerOpen = false;
+              _updateSaveButton();
+            }),
+          ),
         SizedBox(height: 16.h),
-        AppTexts(texTs: 'Comments (optional)'),
+        const AppTexts(texTs: 'Comments (optional)'),
         SizedBox(height: 8.h),
         AppTextField(
           hintText: 'Add Comments',
-          controller: _commentsController,
+          controller: _incomeCommentCtrl,
           onChanged: (_) => _updateSaveButton(),
         ),
         SizedBox(height: 24.h),
@@ -530,144 +503,37 @@ class _AddTransactionPageState extends State<AddTransactionPage>
     );
   }
 
+  // ---------- Expenses UI ----------
   Widget _buildExpensesForm(List<OmegaShootModel> shoots) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(height: 16.h),
-        AppTexts(texTs: 'Select Shoot'),
+        const AppTexts(texTs: 'Select Shoot'),
         SizedBox(height: 8.h),
-        _buildShootPickerButton(),
-        if (_isShootPickerOpen)
-          Padding(
-            padding: EdgeInsets.only(top: 16.h),
-            child: Container(
-              height: 288.h,
-              decoration: BoxDecoration(
-                color: AppColors.filedGrey,
-                borderRadius: BorderRadius.circular(16.r),
-              ),
-              child: ListView.separated(
-                shrinkWrap: true,
-                physics: const BouncingScrollPhysics(),
-                padding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 16.w),
-                itemCount: shoots.length,
-                separatorBuilder: (_, __) => SizedBox(height: 12.h),
-                itemBuilder: (context, i) {
-                  final shoot = shoots[i];
-                  final isSel = _selectedShoot?.id == shoot.id;
-                  final dt = DateTime(
-                    shoot.date.year,
-                    shoot.date.month,
-                    shoot.date.day,
-                    shoot.time.hour,
-                    shoot.time.minute,
-                  );
-                  File? preview;
-                  final photos = shoot.finalShotsPaths ?? [];
-                  if (photos.isNotEmpty) {
-                    final f = File(photos.first);
-                    if (f.existsSync()) preview = f;
-                  }
-                  return InkWell(
-                    onTap: () => setState(() {
-                      _selectedShoot = shoot;
-                      _isShootPickerOpen = false;
-                      _updateSaveButton();
-                    }),
-                    borderRadius: BorderRadius.circular(16.r),
-                    child: Container(
-                      height: 80.h,
-                      padding: EdgeInsets.symmetric(horizontal: 12.w),
-                      decoration: BoxDecoration(
-                        color: AppColors.cardGrey,
-                        borderRadius: BorderRadius.circular(16.r),
-                        border: Border.all(
-                          color:
-                              isSel ? AppColors.mainAccent : AppColors.cardGrey,
-                          width: 1.5,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  DateFormat('MMM d, yyyy, h:mm a').format(dt),
-                                  style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 14.sp,
-                                      fontWeight: FontWeight.w500),
-                                ),
-                                SizedBox(height: 4.h),
-                                Text(
-                                  shoot.clientName,
-                                  style: TextStyle(
-                                      color: AppColors.textgrey,
-                                      fontSize: 14.sp),
-                                ),
-                              ],
-                            ),
-                          ),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(8.r),
-                            child: preview != null
-                                ? Image.file(preview,
-                                    width: 40.w,
-                                    height: 40.h,
-                                    fit: BoxFit.cover)
-                                : Container(
-                                    width: 40.w,
-                                    height: 40.h,
-                                    decoration: BoxDecoration(
-                                      color:
-                                          AppColors.textgrey.withOpacity(0.2),
-                                      borderRadius: BorderRadius.circular(8.r),
-                                    ),
-                                    child: Icon(
-                                      photos.isNotEmpty
-                                          ? Icons.broken_image
-                                          : Icons.no_photography_outlined,
-                                      color: AppColors.textgrey,
-                                      size: 24.r,
-                                    ),
-                                  ),
-                          ),
-                          if (photos.length > 1)
-                            Padding(
-                              padding: EdgeInsets.only(left: 8.w),
-                              child: Container(
-                                width: 40.w,
-                                height: 40.h,
-                                decoration: BoxDecoration(
-                                  color: AppColors.grey2,
-                                  borderRadius: BorderRadius.circular(8.r),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    '+${photos.length - 1}',
-                                    style: TextStyle(
-                                      color: AppColors.textWhite,
-                                      fontSize: 14.sp,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
+        _buildShootPickerButton(
+          selected: _expenseShoot,
+          isOpen: _isExpenseShootPickerOpen,
+          onToggle: () => setState(
+              () => _isExpenseShootPickerOpen = !_isExpenseShootPickerOpen),
+          onSelect: (s) => setState(() {
+            _expenseShoot = s;
+            _isExpenseShootPickerOpen = false;
+            _updateSaveButton();
+          }),
+        ),
+        if (_isExpenseShootPickerOpen)
+          _buildShootList(
+            shoots: shoots,
+            selected: _expenseShoot,
+            onSelect: (s) => setState(() {
+              _expenseShoot = s;
+              _isExpenseShootPickerOpen = false;
+              _updateSaveButton();
+            }),
           ),
         SizedBox(height: 16.h),
-        AppTexts(texTs: 'Expenses'),
+        const AppTexts(texTs: 'Expenses'),
         SizedBox(height: 8.h),
         ListView.builder(
           shrinkWrap: true,
@@ -675,7 +541,7 @@ class _AddTransactionPageState extends State<AddTransactionPage>
           itemCount: _expenseItems.length,
           itemBuilder: (context, idx) {
             final e = _expenseItems[idx];
-            final filled = _isExpenseFilled(e);
+            final filled = _expenseRowFilled(e);
             return Padding(
               padding: EdgeInsets.only(bottom: 12.h),
               child: Container(
@@ -760,24 +626,24 @@ class _AddTransactionPageState extends State<AddTransactionPage>
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Total',
+            const Text('Total',
                 style: TextStyle(
                     color: Colors.white,
-                    fontSize: 16.sp,
+                    fontSize: 16,
                     fontWeight: FontWeight.w600)),
             Text('\$${_calculateTotalExpenses().toStringAsFixed(2)}',
-                style: TextStyle(
+                style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 16.sp,
+                    fontSize: 16,
                     fontWeight: FontWeight.w600)),
           ],
         ),
         SizedBox(height: 16.h),
-        AppTexts(texTs: 'Comments (optional)'),
+        const AppTexts(texTs: 'Comments (optional)'),
         SizedBox(height: 8.h),
         AppTextField(
           hintText: 'Add Comments',
-          controller: _commentsController,
+          controller: _expenseCommentCtrl,
           onChanged: (_) => _updateSaveButton(),
         ),
         SizedBox(height: 24.h),
@@ -785,12 +651,15 @@ class _AddTransactionPageState extends State<AddTransactionPage>
     );
   }
 
-  Widget _buildShootPickerButton() {
+  // ---------- Общие виджеты ----------
+  Widget _buildShootPickerButton({
+    required OmegaShootModel? selected,
+    required bool isOpen,
+    required VoidCallback onToggle,
+    required ValueChanged<OmegaShootModel> onSelect,
+  }) {
     return GestureDetector(
-      onTap: () => setState(() {
-        _isShootPickerOpen = !_isShootPickerOpen;
-        _updateSaveButton();
-      }),
+      onTap: onToggle,
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 14.h),
         decoration: BoxDecoration(
@@ -800,21 +669,21 @@ class _AddTransactionPageState extends State<AddTransactionPage>
         child: Row(
           children: [
             Expanded(
-              child: _selectedShoot == null
+              child: selected == null
                   ? Text('Select',
                       style:
                           TextStyle(color: AppColors.textgrey, fontSize: 14.sp))
-                  : _buildSelectedShoot(_selectedShoot!),
+                  : _buildSelectedShoot(selected),
             ),
-            if (_selectedShoot != null &&
-                _selectedShoot!.finalShotsPaths != null &&
-                _selectedShoot!.finalShotsPaths!.isNotEmpty)
+            if (selected != null &&
+                selected.finalShotsPaths != null &&
+                selected.finalShotsPaths!.isNotEmpty)
               Padding(
                 padding: EdgeInsets.only(right: 8.w),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(8.r),
                   child: Image.file(
-                    File(_selectedShoot!.finalShotsPaths!.first),
+                    File(selected.finalShotsPaths!.first),
                     width: 40.w,
                     height: 40.h,
                     fit: BoxFit.cover,
@@ -827,7 +696,7 @@ class _AddTransactionPageState extends State<AddTransactionPage>
                 ),
               ),
             Icon(
-              _isShootPickerOpen ? Icons.arrow_drop_up : Icons.arrow_drop_down,
+              isOpen ? Icons.arrow_drop_up : Icons.arrow_drop_down,
               color: AppColors.textgrey,
             ),
           ],
@@ -836,9 +705,12 @@ class _AddTransactionPageState extends State<AddTransactionPage>
     );
   }
 
-  Widget _buildShootList(List<OmegaShootModel> shoots,
-      {bool isExpanded = false}) {
-    final visibleCount = isExpanded ? shoots.length : min(shoots.length, 3);
+  Widget _buildShootList({
+    required List<OmegaShootModel> shoots,
+    required OmegaShootModel? selected,
+    required ValueChanged<OmegaShootModel> onSelect,
+  }) {
+    final visibleCount = min(shoots.length, 3);
     final itemHeight = 80.h;
     final separator = 12.h;
     final totalHeight =
@@ -847,24 +719,27 @@ class _AddTransactionPageState extends State<AddTransactionPage>
     return Padding(
       padding: EdgeInsets.only(top: 16.h),
       child: Container(
-        height: isExpanded ? null : totalHeight,
+        height: totalHeight,
         decoration: BoxDecoration(
           color: AppColors.filedGrey,
           borderRadius: BorderRadius.circular(16.r),
         ),
         child: ListView.separated(
-          shrinkWrap: isExpanded,
-          physics: isExpanded
-              ? const NeverScrollableScrollPhysics()
-              : const BouncingScrollPhysics(),
+          shrinkWrap: true,
+          physics: const BouncingScrollPhysics(),
           padding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 16.w),
           itemCount: shoots.length,
           separatorBuilder: (_, __) => SizedBox(height: separator),
           itemBuilder: (context, i) {
             final shoot = shoots[i];
-            final isSel = _selectedShoot?.id == shoot.id;
-            final dt = DateTime(shoot.date.year, shoot.date.month,
-                shoot.date.day, shoot.time.hour, shoot.time.minute);
+            final isSel = selected?.id == shoot.id;
+            final dt = DateTime(
+              shoot.date.year,
+              shoot.date.month,
+              shoot.date.day,
+              shoot.time.hour,
+              shoot.time.minute,
+            );
             File? preview;
             final photos = shoot.finalShotsPaths ?? [];
             if (photos.isNotEmpty) {
@@ -872,21 +747,18 @@ class _AddTransactionPageState extends State<AddTransactionPage>
               if (f.existsSync()) preview = f;
             }
             return InkWell(
-              onTap: () => setState(() {
-                _selectedShoot = shoot;
-                _isShootPickerOpen = false;
-                _updateSaveButton();
-              }),
+              onTap: () => onSelect(shoot),
               borderRadius: BorderRadius.circular(16.r),
               child: Container(
-                height: itemHeight,
+                height: 80.h,
                 padding: EdgeInsets.symmetric(horizontal: 12.w),
                 decoration: BoxDecoration(
                   color: AppColors.cardGrey,
                   borderRadius: BorderRadius.circular(16.r),
                   border: Border.all(
-                      color: isSel ? AppColors.mainAccent : AppColors.cardGrey,
-                      width: 1.5),
+                    color: isSel ? AppColors.mainAccent : AppColors.cardGrey,
+                    width: 1.5,
+                  ),
                 ),
                 child: Row(
                   children: [
@@ -924,11 +796,12 @@ class _AddTransactionPageState extends State<AddTransactionPage>
                                 borderRadius: BorderRadius.circular(8.r),
                               ),
                               child: Icon(
-                                  photos.isNotEmpty
-                                      ? Icons.broken_image
-                                      : Icons.no_photography_outlined,
-                                  color: AppColors.textgrey,
-                                  size: 24.r),
+                                photos.isNotEmpty
+                                    ? Icons.broken_image
+                                    : Icons.no_photography_outlined,
+                                color: AppColors.textgrey,
+                                size: 24.r,
+                              ),
                             ),
                     ),
                     if (photos.length > 1)
@@ -960,6 +833,34 @@ class _AddTransactionPageState extends State<AddTransactionPage>
           },
         ),
       ),
+    );
+  }
+
+  Widget _buildSelectedShoot(OmegaShootModel shoot) {
+    final dt = DateTime(
+      shoot.date.year,
+      shoot.date.month,
+      shoot.date.day,
+      shoot.time.hour,
+      shoot.time.minute,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          DateFormat('MMM d, yyyy, h:mm a').format(dt),
+          style: TextStyle(
+              color: Colors.white,
+              fontSize: 14.sp,
+              fontWeight: FontWeight.w500),
+        ),
+        SizedBox(height: 4.h),
+        Text(
+          '${shoot.clientName}, ${shoot.address}',
+          style: TextStyle(color: AppColors.textgrey, fontSize: 14.sp),
+        ),
+      ],
     );
   }
 }

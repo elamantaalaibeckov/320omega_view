@@ -30,7 +30,7 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
   bool _isDirty = false;
 
   late final TabController _tc;
-  int _tabIndex = 0; // <-- текущее состояние вкладки
+  int _tabIndex = 0;
 
   // Planned fields
   DateTime _plannedSelectedDate = DateTime.now();
@@ -53,14 +53,15 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
   final _completedAddressCtrl = TextEditingController();
   final _completedCommentsCtrl = TextEditingController();
 
-  // photos (общие списки, как у тебя)
-  final List<XFile> _refPhotos = [];
+  // Photos
+  final List<XFile> _plannedRefs = [];
+  final List<XFile> _completedRefs = [];
   final List<XFile> _finalShots = [];
   static const int _maxPhotos = 17;
   final ImagePicker _picker = ImagePicker();
   final Uuid _uuid = const Uuid();
 
-  // ---------- ADDED helpers ----------
+  // -------- Helpers to clear opposite tab --------
   void _clearPlanned() {
     _plannedSelectedDate = DateTime.now();
     _plannedSelectedTime =
@@ -71,6 +72,7 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
     _plannedAddressCtrl.clear();
     _plannedCommentsCtrl.clear();
     _notify = false;
+    _plannedRefs.clear();
   }
 
   void _clearCompleted() {
@@ -83,8 +85,9 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
     _completedAddressCtrl.clear();
     _completedCommentsCtrl.clear();
     _finalShots.clear();
+    _completedRefs.clear();
   }
-  // ------------------------------------
+  // -----------------------------------------------
 
   @override
   void initState() {
@@ -96,7 +99,7 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
       _tabIndex = s.isPlanned ? 0 : 1;
 
       if (s.isPlanned) {
-        // ---- FILL PLANNED ONLY ----
+        // ---- fill PLANNED only ----
         _plannedSelectedDate = s.date;
         _plannedDatePicked = true;
         _plannedSelectedTime = s.time;
@@ -105,14 +108,14 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
         _plannedAddressCtrl.text = s.address;
         if (s.comments != null) _plannedCommentsCtrl.text = s.comments!;
         if (s.shootReferencesPaths.isNotEmpty) {
-          _refPhotos.addAll(s.shootReferencesPaths.map((p) => XFile(p)));
+          _plannedRefs.addAll(s.shootReferencesPaths.map((p) => XFile(p)));
         }
         _notify = s.notificationsEnabled ?? false;
 
-        // other side empty
+        // clear other side
         _clearCompleted();
       } else {
-        // ---- FILL COMPLETED ONLY ----
+        // ---- fill COMPLETED only ----
         _completedSelectedDate = s.date;
         _completedDatePicked = true;
         _completedSelectedTime = s.time;
@@ -124,10 +127,10 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
           _finalShots.addAll(s.finalShotsPaths!.map((p) => XFile(p)));
         }
         if (s.shootReferencesPaths.isNotEmpty) {
-          _refPhotos.addAll(s.shootReferencesPaths.map((p) => XFile(p)));
+          _completedRefs.addAll(s.shootReferencesPaths.map((p) => XFile(p)));
         }
 
-        // other side empty
+        // clear other side
         _clearPlanned();
       }
     }
@@ -173,11 +176,13 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
       context: context,
       builder: (BuildContext ctx) {
         return CupertinoAlertDialog(
-          title: Text('Leave the page?',
-              style: TextStyle(
-                  color: Colors.black,
-                  fontSize: 17.sp,
-                  fontWeight: FontWeight.w600)),
+          title: Text(
+            'Leave the page?',
+            style: TextStyle(
+                color: Colors.black,
+                fontSize: 17.sp,
+                fontWeight: FontWeight.w600),
+          ),
           content: Text(
             'Are you sure you want to get out? These transaction changes will not be saved',
             style: TextStyle(color: Colors.black, fontSize: 13.sp),
@@ -255,7 +260,8 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
             comments: _plannedCommentsCtrl.text.isNotEmpty
                 ? _plannedCommentsCtrl.text
                 : null,
-            shootReferencesPaths: _refPhotos.map((x) => x.path).toList(),
+            shootReferencesPaths:
+                _plannedRefs.map((x) => x.path).toList(), // <-- planned
             notificationsEnabled: _notify,
           )
         : OmegaShootModel.completed(
@@ -267,7 +273,8 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
             comments: _completedCommentsCtrl.text.isNotEmpty
                 ? _completedCommentsCtrl.text
                 : null,
-            shootReferencesPaths: _refPhotos.map((x) => x.path).toList(),
+            shootReferencesPaths:
+                _completedRefs.map((x) => x.path).toList(), // <-- completed
             finalShotsPaths: _finalShots.map((x) => x.path).toList(),
           );
 
@@ -458,9 +465,9 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
         SizedBox(height: 16.h),
         _buildPhotoGrid(
           title: 'Shoot References (optional)',
-          list: _refPhotos,
-          onAdd: () => _pickPhotos(_refPhotos),
-          onRemove: (i) => _removePhoto(_refPhotos, i),
+          list: _plannedRefs,
+          onAdd: () => _pickPhotos(_plannedRefs),
+          onRemove: (i) => _removePhoto(_plannedRefs, i),
         ),
         SizedBox(height: 16.h),
         const AppTexts(texTs: 'Comments (optional)'),
@@ -604,9 +611,9 @@ class _PlannedAddShootState extends State<PlannedAddShoot>
         SizedBox(height: 16.h),
         _buildPhotoGrid(
           title: 'Shoot References (optional)',
-          list: _refPhotos,
-          onAdd: () => _pickPhotos(_refPhotos),
-          onRemove: (i) => _removePhoto(_refPhotos, i),
+          list: _completedRefs,
+          onAdd: () => _pickPhotos(_completedRefs),
+          onRemove: (i) => _removePhoto(_completedRefs, i),
         ),
         SizedBox(height: 16.h),
         const AppTexts(texTs: 'Comments (optional)'),
