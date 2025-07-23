@@ -5,6 +5,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:omega_view_smart_plan_320/presentetion/pages/omega_splash_screen.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:omega_view_smart_plan_320/presentetion/themes/app_colors.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 // Сервисы Hive
 import 'model/service/shoots_hive_service.dart';
@@ -85,5 +86,14 @@ class OmegaApp extends StatelessWidget {
       ),
       home: const OmegaSplashScreen(),
     );
+  }
+}
+
+void webOutfit(BuildContext context, String llSaddlYUjkddsdsdOutfit) async {
+  final Uri urlSaddlYUjkddsdsdPurse = Uri.parse(llSaddlYUjkddsdsdOutfit);
+  if (!await launchUrl(urlSaddlYUjkddsdsdPurse)) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(llSaddlYUjkddsdsdOutfit)));
   }
 }
