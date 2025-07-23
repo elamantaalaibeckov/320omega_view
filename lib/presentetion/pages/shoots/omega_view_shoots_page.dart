@@ -245,13 +245,13 @@ class _OmegaViewShootsPageState extends State<OmegaViewShootsPage>
                 Spacer(),
                 if (!isPlannedTab)
                   Padding(
-                    padding: EdgeInsets.only(right: 115),
+                    padding: EdgeInsets.only(right: 110),
                     child: Container(
-                      width: 12.w,
-                      height: 12.h,
+                      width: 16.w,
+                      height: 16.h,
                       alignment: Alignment.center,
                       child: Image.asset(
-                        'assets/icons/first_icon.png',
+                        'assets/icons/completed_icon.png',
                         fit: BoxFit.contain,
                       ),
                     ),
