@@ -73,7 +73,6 @@ class _OmegaViewAnalyticsPageState extends State<OmegaViewAnalyticsPage>
     final top5 = topClients.take(5).toList();
     final totalTopIncome = top5.map((e) => e.value).fold(0.0, (a, b) => a + b);
 
-    // стили для табов
     final accent = AppColors.mainAccent;
     final idx = _tabController.index;
     final indicatorRadius = idx == 0
@@ -87,9 +86,8 @@ class _OmegaViewAnalyticsPageState extends State<OmegaViewAnalyticsPage>
                 bottomRight: Radius.circular(16.r),
               )
             : BorderRadius.zero;
-
     final net = incomeSum - expenseSum;
-    final netColor = net >= 0 ? accent : Colors.redAccent;
+    final netColor = net >= 0 ? Colors.green : Colors.redAccent;
 
     final periods = ['1 week', '1 month', '3 months', '6 months'];
     return Scaffold(
@@ -111,8 +109,6 @@ class _OmegaViewAnalyticsPageState extends State<OmegaViewAnalyticsPage>
         padding: EdgeInsets.symmetric(vertical: 16.h, horizontal: 16.w),
         child: Column(
           children: [
-            // TabBar
-
             Container(
               decoration: BoxDecoration(
                 color: AppColors.bgColor,
@@ -122,9 +118,8 @@ class _OmegaViewAnalyticsPageState extends State<OmegaViewAnalyticsPage>
                 controller: _tabController,
                 dividerColor: AppColors.bgColor,
                 isScrollable: true,
-                padding: EdgeInsets.zero, // общий отступ вокруг всей полосы
-                labelPadding:
-                    EdgeInsets.zero, // убираем дефолтный отступ между табами
+                padding: EdgeInsets.zero,
+                labelPadding: EdgeInsets.zero,
                 indicatorPadding: EdgeInsets.zero,
                 tabAlignment: TabAlignment.start,
                 indicator: BoxDecoration(
@@ -139,12 +134,10 @@ class _OmegaViewAnalyticsPageState extends State<OmegaViewAnalyticsPage>
                 tabs: periods
                     .map((t) => Tab(
                           child: Container(
-                            height: 54.h, // высота таба
-                            width:
-                                120.w, // ширина таба (если нужно фиксированно)
+                            height: 54.h,
+                            width: 120.w,
                             alignment: Alignment.center,
                             padding: EdgeInsets.symmetric(
-                              // внутренний отступ текста
                               horizontal: 16.w,
                               vertical: 8.h,
                             ),
@@ -158,12 +151,10 @@ class _OmegaViewAnalyticsPageState extends State<OmegaViewAnalyticsPage>
                     .toList(),
               ),
             ),
-
             SizedBox(height: 24.h),
-
             SizedBox(
-              width: 220.w,
-              height: 220.h,
+              width: 196.w,
+              height: 196.h,
               child: CustomPaint(
                 painter: _DonutPainter(income: incomeSum, expense: expenseSum),
                 child: Center(
@@ -179,8 +170,6 @@ class _OmegaViewAnalyticsPageState extends State<OmegaViewAnalyticsPage>
               ),
             ),
             SizedBox(height: 24.h),
-
-            // InfoCards
             Row(
               children: [
                 Expanded(
@@ -199,8 +188,6 @@ class _OmegaViewAnalyticsPageState extends State<OmegaViewAnalyticsPage>
               ],
             ),
             SizedBox(height: 24.h),
-
-            // Top 5 clients
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
@@ -241,7 +228,6 @@ class _OmegaViewAnalyticsPageState extends State<OmegaViewAnalyticsPage>
                           orElse: () => OmegaShootModel.empty(),
                         );
 
-                        // фотография клиента
                         File? preview;
                         final photos = firstShoot.finalShotsPaths ?? [];
                         if (photos.isNotEmpty) {
@@ -249,7 +235,6 @@ class _OmegaViewAnalyticsPageState extends State<OmegaViewAnalyticsPage>
                           if (f.existsSync()) preview = f;
                         }
 
-                        // бейдж +N
                         final badgeCount =
                             photos.length > 1 ? photos.length - 1 : 0;
 
@@ -360,7 +345,6 @@ class _DonutPainter extends CustomPainter {
     final rect = Offset.zero & size;
     final thickness = size.width * 0.15;
 
-    // фон
     final paintBg = Paint()
       ..color = AppColors.grey2
       ..style = PaintingStyle.stroke
@@ -372,12 +356,12 @@ class _DonutPainter extends CustomPainter {
         ..color = Colors.green
         ..style = PaintingStyle.stroke
         ..strokeWidth = thickness
-        ..strokeCap = StrokeCap.round;
+        ..strokeCap = StrokeCap.butt; // Изменено на StrokeCap.butt
       final paintExp = Paint()
         ..color = Colors.red
         ..style = PaintingStyle.stroke
         ..strokeWidth = thickness
-        ..strokeCap = StrokeCap.round;
+        ..strokeCap = StrokeCap.butt; // Изменено на StrokeCap.butt
 
       final sweepInc = 2 * pi * (income / total);
       canvas.drawArc(rect, -pi / 2, sweepInc, false, paintInc);
